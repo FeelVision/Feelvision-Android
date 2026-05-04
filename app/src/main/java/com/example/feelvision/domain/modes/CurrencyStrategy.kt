@@ -33,6 +33,13 @@ class CurrencyStrategy @Inject constructor(
     }
 
     override suspend fun processFrame(bitmap: Bitmap): ModeResult {
+        return processFrameStreaming(bitmap) { /* no UI callback when called via processFrame */ }
+    }
+
+    override suspend fun processFrameStreaming(
+        bitmap: Bitmap,
+        onChunk: suspend (String) -> Unit
+    ): ModeResult {
         if (bitmap.isRecycled || bitmap.width == 0 || bitmap.height == 0) {
             log.log(DebugLogType.ERROR, "CUR", "Invalid bitmap")
             return ModeResult.Error("Invalid bitmap")
@@ -51,39 +58,64 @@ class CurrencyStrategy @Inject constructor(
             }
 
             log.log(DebugLogType.INFERENCE, "CUR",
-                "Processing single frame ${bitmap.width}×${bitmap.height}")
+                "Calling gemma.generateStream — streaming mode")
 
-            when (val result = gemma.generate(
+            val sentenceBuffer = StringBuilder()
+            val fullText = StringBuilder()
+            var hadError: InferenceResult.Failure? = null
+
+            gemma.generateStream(
                 prompt           = "Identify the currency note in this image.",
                 images           = listOf(bitmap),
                 baseSystemPrompt = ModePrompts.CURRENCY,
                 modeTag          = "CURRENCY",
                 responseLanguage = language
-            )) {
-                is InferenceResult.Success -> {
-                    log.log(DebugLogType.OK, "CUR", "Currency: ${result.text.take(80)}...")
-                    tts.speak(result.text)
-                    ModeResult.CurrencyDetected(
-                        denomination = result.text,
-                        series       = "",
-                        confidence   = 1f
-                    )
+            ).collect { result ->
+                when (result) {
+                    is InferenceResult.Streaming -> {
+                        fullText.append(result.partial)
+                        sentenceBuffer.append(result.partial)
+                        val text = sentenceBuffer.toString()
+                        val lastBoundary = text.lastIndexOfAny(charArrayOf('.', '!', '?', '\n'))
+                        if (lastBoundary >= 0) {
+                            val toSpeak = text.substring(0, lastBoundary + 1).trim()
+                            if (toSpeak.isNotEmpty()) {
+                                tts.speakChunk(toSpeak)
+                                onChunk(toSpeak)
+                            }
+                            sentenceBuffer.clear()
+                            sentenceBuffer.append(text.substring(lastBoundary + 1))
+                        }
+                    }
+                    is InferenceResult.Failure -> { hadError = result }
+                    is InferenceResult.NotReady -> { hadError = InferenceResult.Failure("Not ready") }
+                    else -> {}
                 }
-                is InferenceResult.Failure -> {
-                    log.log(DebugLogType.ERROR, "CUR", "generate() failed: ${result.error}")
-                    tts.speak("I could not identify the currency.")
-                    ModeResult.Error(result.error)
-                }
-                is InferenceResult.NotReady -> {
-                    log.log(DebugLogType.WARN, "CUR", "NotReady returned from generate()")
-                    tts.speak("Model not ready.")
-                    ModeResult.Error("Not ready")
-                }
-                else -> ModeResult.NoResult
+            }
+
+            val remaining = sentenceBuffer.toString().trim()
+            if (remaining.isNotEmpty()) {
+                tts.speakChunk(remaining)
+                onChunk(remaining)
+            }
+
+            if (hadError != null) {
+                log.log(DebugLogType.ERROR, "CUR", "stream failed: ${hadError!!.error}")
+                tts.speak("I could not identify the currency.")
+                ModeResult.Error(hadError!!.error)
+            } else if (fullText.isNotEmpty()) {
+                ModeResult.CurrencyDetected(
+                    denomination = fullText.toString().trim(),
+                    series       = "",
+                    confidence   = 1f
+                )
+            } else {
+                tts.speak("I could not identify the currency.")
+                ModeResult.Error("Empty response")
             }
         } catch (e: Exception) {
             log.log(DebugLogType.ERROR, "CUR",
-                "processFrame CRASHED: ${e.javaClass.simpleName}: ${e.message}")
+                "processFrameStreaming CRASHED: ${e.javaClass.simpleName}: ${e.message}")
             tts.speak("Something went wrong identifying currency.")
             ModeResult.Error(e.message ?: "Unknown error")
         } finally {

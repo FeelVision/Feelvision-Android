@@ -20,4 +20,27 @@ interface ModeStrategy {
     suspend fun processFrames(bitmaps: List<Bitmap>): ModeResult {
         return processFrame(bitmaps.last())
     }
+
+    /**
+     * Stream-process a single frame: emits partial text chunks via [onChunk]
+     * as they are generated, enabling immediate TTS playback.
+     * Default falls back to non-streaming [processFrame].
+     */
+    suspend fun processFrameStreaming(
+        bitmap: Bitmap,
+        onChunk: suspend (String) -> Unit
+    ): ModeResult {
+        return processFrame(bitmap)
+    }
+
+    /**
+     * Stream-process multiple frames: emits partial text chunks via [onChunk].
+     * Default falls back to non-streaming [processFrames].
+     */
+    suspend fun processFramesStreaming(
+        bitmaps: List<Bitmap>,
+        onChunk: suspend (String) -> Unit
+    ): ModeResult {
+        return processFrames(bitmaps)
+    }
 }

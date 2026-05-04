@@ -27,6 +27,7 @@ data class DebugUiState(
     val gemmaReady: Boolean     = false,
     val burstProgress: String?  = null,   // e.g. "3/5" during burst capture
     val isListeningForMode: Boolean = false,
+    val streamingText: String   = "",     // incrementally built text during streaming inference
 )
 
 @HiltViewModel
@@ -113,8 +114,8 @@ class DebugViewModel @Inject constructor(
 
     /**
      * Mode-aware capture:
-     * - SingleShot modes (Default, OCR, etc.) → capture 1 image → processFrame
-     * - BurstInterval modes (Navigate)        → capture N images at interval → processFrames
+     * - SingleShot modes (Default, OCR, etc.) → capture 1 image → processFrameStreaming
+     * - BurstInterval modes (Navigate)        → capture N images at interval → processFramesStreaming
      */
     fun captureNow() {
         if (_state.value.isInferring || _state.value.burstProgress != null) {
@@ -142,14 +143,18 @@ class DebugViewModel @Inject constructor(
 
     private suspend fun executeSingleCapture() {
         appendLog("[CMD] Single capture requested (${coordinator.activeMode.displayName})")
+        _state.update { it.copy(streamingText = "") }
         val bmp = hardware.captureNow()
         if (bmp != null) {
             appendLog("[OK] Frame: ${bmp.width}×${bmp.height}")
             if (gemma.isReady()) {
-                appendLog("[CMD] Processing with ${coordinator.activeMode.shortLabel} strategy...")
+                appendLog("[CMD] Streaming with ${coordinator.activeMode.shortLabel} strategy...")
                 _state.update { it.copy(isInferring = true) }
                 try {
-                    coordinator.activeStrategy.processFrame(bmp)
+                    coordinator.activeStrategy.processFrameStreaming(bmp) { chunk ->
+                        _state.update { it.copy(streamingText = it.streamingText + chunk + " ") }
+                        appendLog("[STREAM] $chunk")
+                    }
                 } finally {
                     _state.update { it.copy(isInferring = false) }
                 }
@@ -165,6 +170,7 @@ class DebugViewModel @Inject constructor(
 
     private suspend fun executeBurstCapture(policy: CapturePolicy.BurstInterval) {
         appendLog("[CMD] Burst capture: ${policy.count} frames @ ${policy.intervalMs}ms interval")
+        _state.update { it.copy(streamingText = "") }
 
         val frames = mutableListOf<Bitmap>()
         _state.update { it.copy(burstProgress = "0/${policy.count}") }
@@ -188,12 +194,15 @@ class DebugViewModel @Inject constructor(
                 }
             }
 
-            appendLog("[CMD] All ${frames.size} frames captured — sending to ${coordinator.activeMode.shortLabel} strategy...")
+            appendLog("[CMD] All ${frames.size} frames captured — streaming to ${coordinator.activeMode.shortLabel} strategy...")
             _state.update { it.copy(burstProgress = null, isInferring = true) }
 
             if (gemma.isReady()) {
                 try {
-                    coordinator.activeStrategy.processFrames(frames)
+                    coordinator.activeStrategy.processFramesStreaming(frames) { chunk ->
+                        _state.update { it.copy(streamingText = it.streamingText + chunk + " ") }
+                        appendLog("[STREAM] $chunk")
+                    }
                 } finally {
                     _state.update { it.copy(isInferring = false) }
                 }

@@ -11,7 +11,7 @@ object ModePrompts {
 
     const val DEFAULT =
         "$BASE Describe what you see in the image naturally and helpfully. " +
-        "Mention objects, people, text, or anything useful. Keep it to two or three sentences."
+        "Mention objects, people, text, or anything useful. Elaborate on this for 8-10 lines."
 
     const val OCR =
         "$BASE Read all visible text in the image exactly as it appears. " +

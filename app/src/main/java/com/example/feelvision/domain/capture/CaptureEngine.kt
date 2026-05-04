@@ -29,7 +29,7 @@ class CaptureEngine @Inject constructor(
         activeJob?.cancel()
         activeJob = scope.launch {
             val bmp = hardware.captureNow() ?: return@launch
-            strategy.processFrame(bmp)
+            strategy.processFrameStreaming(bmp) { /* TTS handled inside strategy */ }
         }
     }
 
@@ -51,7 +51,7 @@ class CaptureEngine @Inject constructor(
                 if (i < policy.count - 1) delay(policy.intervalMs)
             }
             if (frames.isNotEmpty()) {
-                strategy.processFrames(frames)
+                strategy.processFramesStreaming(frames) { /* TTS handled inside strategy */ }
             }
         }
     }
@@ -61,7 +61,7 @@ class CaptureEngine @Inject constructor(
         activeJob = scope.launch {
             while (isActive) {
                 val bmp = hardware.captureNow()
-                if (bmp != null) strategy.processFrame(bmp)
+                if (bmp != null) strategy.processFrameStreaming(bmp) { /* TTS handled inside strategy */ }
                 delay(policy.intervalMs)
             }
         }

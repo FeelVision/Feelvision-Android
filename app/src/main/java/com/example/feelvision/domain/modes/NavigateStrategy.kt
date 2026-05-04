@@ -36,20 +36,32 @@ class NavigateStrategy @Inject constructor(
      * Single-frame fallback — used if CaptureEngine calls processFrame directly.
      */
     override suspend fun processFrame(bitmap: Bitmap): ModeResult {
-        return processFrames(listOf(bitmap))
+        return processFramesStreaming(listOf(bitmap)) { /* no UI callback */ }
     }
 
     /**
-     * Primary entry: receives all burst-captured frames and sends them
-     * together to Gemma for directional navigation guidance.
+     * Primary entry: delegates to processFramesStreaming with a no-op UI callback.
      */
     override suspend fun processFrames(bitmaps: List<Bitmap>): ModeResult {
+        return processFramesStreaming(bitmaps) { /* no UI callback */ }
+    }
+
+    override suspend fun processFrameStreaming(
+        bitmap: Bitmap,
+        onChunk: suspend (String) -> Unit
+    ): ModeResult {
+        return processFramesStreaming(listOf(bitmap), onChunk)
+    }
+
+    override suspend fun processFramesStreaming(
+        bitmaps: List<Bitmap>,
+        onChunk: suspend (String) -> Unit
+    ): ModeResult {
         if (bitmaps.isEmpty()) {
             log.log(DebugLogType.ERROR, "NAV", "No frames to process")
             return ModeResult.Error("No frames")
         }
 
-        // Validate all bitmaps
         val valid = bitmaps.filter { !it.isRecycled && it.width > 0 && it.height > 0 }
         if (valid.isEmpty()) {
             log.log(DebugLogType.ERROR, "NAV", "All ${bitmaps.size} frames are invalid")
@@ -69,39 +81,63 @@ class NavigateStrategy @Inject constructor(
             }
 
             log.log(DebugLogType.INFERENCE, "NAV",
-                "Processing ${valid.size} frames for navigation guidance")
+                "Streaming ${valid.size} frames for navigation guidance")
 
-            when (val result = gemma.generate(
+            val sentenceBuffer = StringBuilder()
+            val fullText = StringBuilder()
+            var hadError: InferenceResult.Failure? = null
+
+            gemma.generateStream(
                 prompt           = "Analyze these ${valid.size} sequential images and guide me.",
                 images           = valid,
                 baseSystemPrompt = ModePrompts.NAVIGATE,
                 modeTag          = "NAVIGATE",
                 responseLanguage = language
-            )) {
-                is InferenceResult.Success -> {
-                    log.log(DebugLogType.OK, "NAV",
-                        "Navigation: ${result.text.take(80)}...")
-                    tts.speak(result.text)
-                    ModeResult.NavigationInstruction(
-                        instruction = result.text,
-                        distanceM   = 0f  // no distance estimation from vision alone
-                    )
+            ).collect { result ->
+                when (result) {
+                    is InferenceResult.Streaming -> {
+                        fullText.append(result.partial)
+                        sentenceBuffer.append(result.partial)
+                        val text = sentenceBuffer.toString()
+                        val lastBoundary = text.lastIndexOfAny(charArrayOf('.', '!', '?', '\n'))
+                        if (lastBoundary >= 0) {
+                            val toSpeak = text.substring(0, lastBoundary + 1).trim()
+                            if (toSpeak.isNotEmpty()) {
+                                tts.speakChunk(toSpeak)
+                                onChunk(toSpeak)
+                            }
+                            sentenceBuffer.clear()
+                            sentenceBuffer.append(text.substring(lastBoundary + 1))
+                        }
+                    }
+                    is InferenceResult.Failure -> { hadError = result }
+                    is InferenceResult.NotReady -> { hadError = InferenceResult.Failure("Not ready") }
+                    else -> {}
                 }
-                is InferenceResult.Failure -> {
-                    log.log(DebugLogType.ERROR, "NAV", "generate() failed: ${result.error}")
-                    tts.speak("I could not assess the path ahead.")
-                    ModeResult.Error(result.error)
-                }
-                is InferenceResult.NotReady -> {
-                    log.log(DebugLogType.WARN, "NAV", "NotReady returned from generate()")
-                    tts.speak("Model not ready.")
-                    ModeResult.Error("Not ready")
-                }
-                else -> ModeResult.NoResult
+            }
+
+            val remaining = sentenceBuffer.toString().trim()
+            if (remaining.isNotEmpty()) {
+                tts.speakChunk(remaining)
+                onChunk(remaining)
+            }
+
+            if (hadError != null) {
+                log.log(DebugLogType.ERROR, "NAV", "stream failed: ${hadError!!.error}")
+                tts.speak("I could not assess the path ahead.")
+                ModeResult.Error(hadError!!.error)
+            } else if (fullText.isNotEmpty()) {
+                ModeResult.NavigationInstruction(
+                    instruction = fullText.toString().trim(),
+                    distanceM   = 0f
+                )
+            } else {
+                tts.speak("I could not assess the path ahead.")
+                ModeResult.Error("Empty response")
             }
         } catch (e: Exception) {
             log.log(DebugLogType.ERROR, "NAV",
-                "processFrames CRASHED: ${e.javaClass.simpleName}: ${e.message}")
+                "processFramesStreaming CRASHED: ${e.javaClass.simpleName}: ${e.message}")
             tts.speak("Something went wrong with navigation.")
             ModeResult.Error(e.message ?: "Unknown error")
         } finally {

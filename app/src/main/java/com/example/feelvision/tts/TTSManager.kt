@@ -49,6 +49,18 @@ class TTSManager @Inject constructor(
         )
     }
 
+    /** Append a chunk of streamed text to the TTS queue without flushing. */
+    fun speakChunk(text: String) {
+        if (text.isBlank()) return
+        lastUtterance = text
+        tts?.speak(
+            text,
+            TextToSpeech.QUEUE_ADD,
+            null,
+            UUID.randomUUID().toString()
+        )
+    }
+
     fun silence()    { tts?.stop(); _isSpeaking.value = false }
     fun repeatLast() { if (lastUtterance.isNotEmpty()) speak(lastUtterance) }
 

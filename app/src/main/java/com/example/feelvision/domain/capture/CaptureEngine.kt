@@ -5,6 +5,8 @@ import com.feelvision.domain.model.CapturePolicy
 import com.feelvision.domain.modes.ModeStrategy
 import com.feelvision.hardware.HardwareSource
 import com.feelvision.inference.GemmaInferenceManager
+import com.feelvision.tts.TTSManager
+import com.feelvision.speech.SpeechRecognitionManager
 import kotlinx.coroutines.*
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -13,6 +15,8 @@ import javax.inject.Singleton
 class CaptureEngine @Inject constructor(
     private val hardware: HardwareSource,
     private val gemma: GemmaInferenceManager,
+    private val tts: TTSManager,
+    private val speechRecognizer: SpeechRecognitionManager,
     @ApplicationScope private val scope: CoroutineScope
 ) {
     private var activeJob: Job? = null
@@ -44,7 +48,9 @@ class CaptureEngine @Inject constructor(
         cancelActive()
         activeJob = scope.launch {
             val bmp = hardware.captureNow() ?: return@launch
-            strategy.processFrameStreaming(bmp) { /* TTS handled inside strategy */ }
+            tts.playBeep()
+            val prompt = speechRecognizer.waitForSpeech()
+            strategy.processFrameStreaming(bmp, prompt) { /* TTS handled inside strategy */ }
         }
     }
 
@@ -66,7 +72,9 @@ class CaptureEngine @Inject constructor(
                 if (i < policy.count - 1) delay(policy.intervalMs)
             }
             if (frames.isNotEmpty()) {
-                strategy.processFramesStreaming(frames) { /* TTS handled inside strategy */ }
+                tts.playBeep()
+                val prompt = speechRecognizer.waitForSpeech()
+                strategy.processFramesStreaming(frames, prompt) { /* TTS handled inside strategy */ }
             }
         }
     }

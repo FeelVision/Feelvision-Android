@@ -32,12 +32,13 @@ class EducationStrategy @Inject constructor(
         log.log(DebugLogType.MODE, "EDU", "Deactivated")
     }
 
-    override suspend fun processFrame(bitmap: Bitmap): ModeResult {
-        return processFrameStreaming(bitmap) { /* no UI callback when called via processFrame */ }
+    override suspend fun processFrame(bitmap: Bitmap, userPrompt: String?): ModeResult {
+        return processFrameStreaming(bitmap, userPrompt) { /* no UI callback when called via processFrame */ }
     }
 
     override suspend fun processFrameStreaming(
         bitmap: Bitmap,
+        userPrompt: String?,
         onChunk: suspend (String) -> Unit
     ): ModeResult {
         if (bitmap.isRecycled || bitmap.width == 0 || bitmap.height == 0) {
@@ -65,7 +66,7 @@ class EducationStrategy @Inject constructor(
             var hadError: InferenceResult.Failure? = null
 
             gemma.generateStream(
-                prompt           = "Explain what you see in this image in an educational way.",
+                prompt           = userPrompt ?: "Explain what you see in this image in an educational way.",
                 images           = listOf(bitmap),
                 baseSystemPrompt = ModePrompts.EDU,
                 modeTag          = "EDU",

@@ -127,9 +127,14 @@ class MainViewModel @Inject constructor(
         if (bmp != null) {
             // Create a copy for the UI to prevent crash if strategy recycles original
             val displayBmp = bmp.copy(bmp.config ?: Bitmap.Config.ARGB_8888, true)
-            _state.update { it.copy(statusText = "Analyzing...", capturedBitmap = displayBmp) }
+            _state.update { it.copy(statusText = "Listening...", capturedBitmap = displayBmp) }
+            
+            tts.playBeep()
+            val prompt = speechRecognizer.waitForSpeech()
+            
+            _state.update { it.copy(statusText = "Analyzing...") }
             try {
-                val result = coordinator.activeStrategy.processFrameStreaming(bmp) { chunk ->
+                val result = coordinator.activeStrategy.processFrameStreaming(bmp, prompt) { chunk ->
                     _state.update { it.copy(streamingText = it.streamingText + chunk + " ") }
                 }
                 _state.update { it.copy(lastResult = result, statusText = "Ready") }
@@ -182,11 +187,16 @@ class MainViewModel @Inject constructor(
             _state.update { it.copy(
                 burstProgress = null,
                 isInferring = true,
-                statusText = "Analyzing ${frames.size} frames..."
+                statusText = "Listening..."
             ) }
 
+            tts.playBeep()
+            val prompt = speechRecognizer.waitForSpeech()
+            
+            _state.update { it.copy(statusText = "Analyzing ${frames.size} frames...") }
+
             try {
-                val result = coordinator.activeStrategy.processFramesStreaming(frames) { chunk ->
+                val result = coordinator.activeStrategy.processFramesStreaming(frames, prompt) { chunk ->
                     _state.update { it.copy(streamingText = it.streamingText + chunk + " ") }
                 }
                 _state.update { it.copy(lastResult = result, statusText = "Ready") }

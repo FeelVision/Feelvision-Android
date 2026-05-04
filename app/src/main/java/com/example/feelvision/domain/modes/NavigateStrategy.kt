@@ -35,26 +35,28 @@ class NavigateStrategy @Inject constructor(
     /**
      * Single-frame fallback — used if CaptureEngine calls processFrame directly.
      */
-    override suspend fun processFrame(bitmap: Bitmap): ModeResult {
-        return processFramesStreaming(listOf(bitmap)) { /* no UI callback */ }
+    override suspend fun processFrame(bitmap: Bitmap, userPrompt: String?): ModeResult {
+        return processFramesStreaming(listOf(bitmap), userPrompt) { /* no UI callback */ }
     }
 
     /**
      * Primary entry: delegates to processFramesStreaming with a no-op UI callback.
      */
-    override suspend fun processFrames(bitmaps: List<Bitmap>): ModeResult {
-        return processFramesStreaming(bitmaps) { /* no UI callback */ }
+    override suspend fun processFrames(bitmaps: List<Bitmap>, userPrompt: String?): ModeResult {
+        return processFramesStreaming(bitmaps, userPrompt) { /* no UI callback */ }
     }
 
     override suspend fun processFrameStreaming(
         bitmap: Bitmap,
+        userPrompt: String?,
         onChunk: suspend (String) -> Unit
     ): ModeResult {
-        return processFramesStreaming(listOf(bitmap), onChunk)
+        return processFramesStreaming(listOf(bitmap), userPrompt, onChunk)
     }
 
     override suspend fun processFramesStreaming(
         bitmaps: List<Bitmap>,
+        userPrompt: String?,
         onChunk: suspend (String) -> Unit
     ): ModeResult {
         if (bitmaps.isEmpty()) {
@@ -88,7 +90,7 @@ class NavigateStrategy @Inject constructor(
             var hadError: InferenceResult.Failure? = null
 
             gemma.generateStream(
-                prompt           = "Analyze these ${valid.size} sequential images and guide me.",
+                prompt           = userPrompt ?: "Analyze these ${valid.size} sequential images and guide me.",
                 images           = valid,
                 baseSystemPrompt = ModePrompts.NAVIGATE,
                 modeTag          = "NAVIGATE",

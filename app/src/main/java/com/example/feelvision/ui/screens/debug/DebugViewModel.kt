@@ -150,8 +150,13 @@ class DebugViewModel @Inject constructor(
             if (gemma.isReady()) {
                 appendLog("[CMD] Streaming with ${coordinator.activeMode.shortLabel} strategy...")
                 _state.update { it.copy(isInferring = true) }
+                
+                tts.playBeep()
+                val prompt = speechRecognizer.waitForSpeech()
+                appendLog("[PROMPT] $prompt")
+
                 try {
-                    coordinator.activeStrategy.processFrameStreaming(bmp) { chunk ->
+                    coordinator.activeStrategy.processFrameStreaming(bmp, prompt) { chunk ->
                         _state.update { it.copy(streamingText = it.streamingText + chunk + " ") }
                         appendLog("[STREAM] $chunk")
                     }
@@ -198,8 +203,12 @@ class DebugViewModel @Inject constructor(
             _state.update { it.copy(burstProgress = null, isInferring = true) }
 
             if (gemma.isReady()) {
+                tts.playBeep()
+                val prompt = speechRecognizer.waitForSpeech()
+                appendLog("[PROMPT] $prompt")
+
                 try {
-                    coordinator.activeStrategy.processFramesStreaming(frames) { chunk ->
+                    coordinator.activeStrategy.processFramesStreaming(frames, prompt) { chunk ->
                         _state.update { it.copy(streamingText = it.streamingText + chunk + " ") }
                         appendLog("[STREAM] $chunk")
                     }

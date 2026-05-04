@@ -9,13 +9,22 @@ import android.speech.SpeechRecognizer
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
+
+enum class SpeechPurpose {
+    MODE_SWITCH,
+    PROMPT
+}
 
 @Singleton
 class SpeechRecognitionManager @Inject constructor(
@@ -31,8 +40,13 @@ class SpeechRecognitionManager @Inject constructor(
     private val _results = MutableSharedFlow<String>()
     val results: SharedFlow<String> = _results
 
+    private val _promptResults = MutableSharedFlow<String>()
+    val promptResults: SharedFlow<String> = _promptResults
+
     private val _error = MutableSharedFlow<String>()
     val error: SharedFlow<String> = _error
+
+    private var currentPurpose: SpeechPurpose = SpeechPurpose.MODE_SWITCH
 
     private val mainScope = MainScope()
 
@@ -69,7 +83,14 @@ class SpeechRecognitionManager @Inject constructor(
         override fun onResults(results: Bundle?) {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             if (!matches.isNullOrEmpty()) {
-                mainScope.launch { _results.emit(matches[0]) }
+                val text = matches[0]
+                mainScope.launch {
+                    if (currentPurpose == SpeechPurpose.PROMPT) {
+                        _promptResults.emit(text)
+                    } else {
+                        _results.emit(text)
+                    }
+                }
             }
         }
 
@@ -83,7 +104,8 @@ class SpeechRecognitionManager @Inject constructor(
         }
     }
 
-    fun startListening() {
+    fun startListening(purpose: SpeechPurpose = SpeechPurpose.MODE_SWITCH) {
+        currentPurpose = purpose
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
@@ -104,6 +126,19 @@ class SpeechRecognitionManager @Inject constructor(
             speechRecognizer.stopListening()
             _isListening.value = false
         }
+    }
+
+    /**
+     * Suspending version that waits for a single result.
+     * Starts listening, waits for the next emission on 'results', and stops.
+     */
+    suspend fun waitForSpeech(timeoutMs: Long = 8000L): String? = withContext(Dispatchers.Main) {
+        startListening(SpeechPurpose.PROMPT)
+        val result = withTimeoutOrNull(timeoutMs) {
+            promptResults.first()
+        }
+        stopListening()
+        result
     }
 
     fun destroy() {

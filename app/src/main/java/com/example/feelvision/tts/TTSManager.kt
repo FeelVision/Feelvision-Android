@@ -1,6 +1,8 @@
 package com.feelvision.tts
 
 import android.content.Context
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -59,6 +61,19 @@ class TTSManager @Inject constructor(
             null,
             UUID.randomUUID().toString()
         )
+    }
+
+    fun playBeep() {
+        try {
+            val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+            toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+            // ToneGenerator doesn't need explicit release if reused, 
+            // but for one-off beeps it's fine. 
+            // Better to keep a single instance if called frequently, 
+            // but this is called once per capture.
+        } catch (e: Exception) {
+            Log.e("TTS", "Failed to play beep", e)
+        }
     }
 
     fun silence()    { tts?.stop(); _isSpeaking.value = false }

@@ -22,10 +22,10 @@ class NavigateStrategy @Inject constructor(
 ) : ModeStrategy {
 
     override val mode          = AppMode.Navigate
-    override val capturePolicy = CapturePolicy.BurstInterval(count = 5, intervalMs = 3_000L)
+    override val capturePolicy = CapturePolicy.SingleShot
 
     override fun activate() {
-        log.log(DebugLogType.MODE, "NAV", "Activated — burst 5×3s capture")
+        log.log(DebugLogType.MODE, "NAV", "Activated — single-shot capture")
     }
 
     override fun deactivate() {

@@ -438,7 +438,7 @@ class GemmaInferenceManager @Inject constructor(
         context.getExternalFilesDir(null)?.absolutePath,
         "/storage/emulated/0/Download/",
         "/sdcard/Download/",
-        "/storage/emulated/0/Android/data/com.feelvision/files/"
+        "/storage/emulated/0/Android/data/com.example.feelvision/files/"
     )
 
     // ── Model discovery ───────────────────────────────────────────────

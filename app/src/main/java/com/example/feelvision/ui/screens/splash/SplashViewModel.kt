@@ -50,10 +50,10 @@ class SplashViewModel @Inject constructor(
                 // Step 4 — Gemma (non-blocking: model loads in background,
                 // main screen shows a pill while it finishes)
                 _state.update { it.copy(statusMessage = "Preparing model...", progressTarget = 0.8f) }
-                // We deliberately do NOT await gemma.initialize() here —
-                // it can take 10-30s and we don't want to block the splash.
-                // Just trigger it in the background.
-//                viewModelScope.launch { gemma.initialize() }
+                // We fire gemma.initialize() in the background —
+                // it can take 10-30s but the splash proceeds immediately.
+                // Main screen shows a status pill while it finishes.
+                viewModelScope.launch { gemma.initialize() }
 
 
                 // Step 5 — Done

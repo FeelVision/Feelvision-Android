@@ -444,62 +444,38 @@ class GemmaInferenceManager @Inject constructor(
     // ── Model discovery ───────────────────────────────────────────────
 
     private suspend fun findModelFile(): File? = withContext(Dispatchers.IO) {
-        val internalFile = File(context.filesDir, MODEL_NAME)
-        if (internalFile.exists() && internalFile.length() > 1024 * 1024) {
-            debugLogBus.log(
-                DebugLogType.OK, "GEMMA",
-                "Model in internal storage (${internalFile.length() / 1024 / 1024}MB)"
-            )
-            return@withContext internalFile
-        }
-
         val searchDirs = listOfNotNull(
-            context.getExternalFilesDir(null),
-            File("/storage/emulated/0/Download/"),
-            File("/sdcard/Download/"),
-            File("/storage/emulated/0/Android/data/com.feelvision/files/")
+            context.filesDir,                           // internal storage
+            context.getExternalFilesDir(null),           // app-scoped external
+            File("/storage/emulated/0/Android/data/com.example.feelvision/files/")
         ).distinctBy { it.absolutePath }
 
+        // Pass 1 — exact name match
         for (dir in searchDirs) {
             if (!dir.exists()) continue
             val candidate = File(dir, MODEL_NAME)
             if (candidate.exists() && candidate.length() > 1024 * 1024) {
-                debugLogBus.log(DebugLogType.INFO, "GEMMA",
-                    "Found by exact name in ${dir.absolutePath}")
-                return@withContext copyToInternal(candidate, internalFile)
+                debugLogBus.log(DebugLogType.OK, "GEMMA",
+                    "Found by exact name in ${dir.absolutePath} (${candidate.length() / 1024 / 1024}MB)")
+                return@withContext candidate
             }
         }
 
+        // Pass 2 — fuzzy match (any .litertlm containing "gemma")
         for (dir in searchDirs) {
             if (!dir.exists()) continue
             dir.listFiles()?.forEach { file ->
                 val name = file.name.lowercase()
                 if (name.endsWith(".litertlm") && name.contains("gemma")
                     && file.length() > 1024 * 1024) {
-                    debugLogBus.log(DebugLogType.INFO, "GEMMA",
+                    debugLogBus.log(DebugLogType.OK, "GEMMA",
                         "Found by fuzzy match: ${file.name} in ${dir.absolutePath}")
-                    return@withContext copyToInternal(file, internalFile)
+                    return@withContext file
                 }
             }
         }
 
         debugLogBus.log(DebugLogType.ERROR, "GEMMA", "Model not found in any search path")
         null
-    }
-
-    private fun copyToInternal(source: File, dest: File): File {
-        val sizeMb = source.length() / 1024 / 1024
-        debugLogBus.log(DebugLogType.WARN, "GEMMA",
-            "Copying ${source.name} (${sizeMb}MB) to internal storage...")
-        return try {
-            source.copyTo(dest, overwrite = true)
-            debugLogBus.log(DebugLogType.OK, "GEMMA",
-                "Copy complete → ${dest.absolutePath}")
-            dest
-        } catch (e: Exception) {
-            debugLogBus.log(DebugLogType.ERROR, "GEMMA",
-                "Copy failed: ${e.message} — using source directly")
-            source
-        }
     }
 }

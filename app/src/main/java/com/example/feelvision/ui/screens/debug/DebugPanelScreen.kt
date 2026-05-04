@@ -70,9 +70,10 @@
 
                 // Gemma status dot
                 val dotColor = when {
-                    state.isInferring -> Color(0xFF00AAFF)    // blue  = running
-                    state.gemmaReady  -> FVColors.DebugAccent // green = ready
-                    else              -> FVColors.DebugError  // red   = not ready
+                    state.burstProgress != null -> Color(0xFFFFAA00)    // amber = capturing burst
+                    state.isInferring           -> Color(0xFF00AAFF)    // blue  = running
+                    state.gemmaReady            -> FVColors.DebugAccent // green = ready
+                    else                        -> FVColors.DebugError  // red   = not ready
                 }
                 Box(Modifier.size(7.dp).clip(CircleShape).background(dotColor))
                 Spacer(Modifier.width(6.dp))
@@ -88,9 +89,10 @@
                 // Gemma status label
                 Text(
                     when {
-                        state.isInferring -> "Inferring..."
-                        state.gemmaReady  -> "Ready"
-                        else              -> "Not ready"
+                        state.burstProgress != null -> "Burst ${state.burstProgress}"
+                        state.isInferring           -> "Inferring..."
+                        state.gemmaReady            -> "Ready"
+                        else                        -> "Not ready"
                     },
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = dotColor, fontFamily = FontFamily.Monospace
@@ -116,11 +118,11 @@
                 }
             }
 
-            // Inference progress bar
-            if (state.isInferring) {
+            // Inference / burst progress bar
+            if (state.isInferring || state.burstProgress != null) {
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
-                    color = Color(0xFF00AAFF),
+                    color = if (state.burstProgress != null) Color(0xFFFFAA00) else Color(0xFF00AAFF),
                     trackColor = FVColors.DebugSurface
                 )
             }
@@ -160,30 +162,56 @@
                     )
                 }
 
-                // Capture button — disabled while inferring
-                IconButton(
-                    onClick = { viewModel.captureNow() },
-                    enabled = !state.isInferring && state.gemmaReady,
+                // Capture button — disabled while inferring or burst-capturing
+                val isBusy = state.isInferring || state.burstProgress != null
+                Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 8.dp)
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (state.isInferring || !state.gemmaReady)
-                                FVColors.DebugAccent.copy(alpha = 0.05f)
-                            else
-                                FVColors.DebugAccent.copy(alpha = 0.15f)
-                        )
+                        .padding(bottom = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (state.isInferring) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            strokeWidth = 2.dp,
-                            color = Color(0xFF00AAFF)
-                        )
-                    } else {
-                        Icon(Icons.Default.Camera, "Capture", tint = FVColors.DebugAccent)
+                    // Burst progress label
+                    if (state.burstProgress != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF00AAFF).copy(alpha = 0.85f))
+                                .padding(horizontal = 10.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                "Capturing ${state.burstProgress}",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = Color.White,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
+
+                    IconButton(
+                        onClick = { viewModel.captureNow() },
+                        enabled = !isBusy && state.gemmaReady,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isBusy || !state.gemmaReady)
+                                    FVColors.DebugAccent.copy(alpha = 0.05f)
+                                else
+                                    FVColors.DebugAccent.copy(alpha = 0.15f)
+                            )
+                    ) {
+                        if (isBusy) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(0xFF00AAFF)
+                            )
+                        } else {
+                            Icon(Icons.Default.Camera, "Capture", tint = FVColors.DebugAccent)
+                        }
                     }
                 }
             }

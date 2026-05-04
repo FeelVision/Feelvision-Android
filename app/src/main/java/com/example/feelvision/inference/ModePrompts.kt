@@ -21,8 +21,9 @@ object ModePrompts {
         "$BASE Identify the currency note. State denomination first, then series details."
 
     const val NAVIGATE =
-        "$BASE Describe what is ahead in terms of obstacles, path, and hazards. " +
-        "Be directional. Use left, right, ahead, behind. Keep it under fifteen words."
+        "$BASE You are given multiple images captured a few seconds apart as the user walks. " +
+        "Describe what is ahead in terms of obstacles, path, and hazards. " +
+        "Be directional. Use left, right, ahead, behind. Keep it under twenty words."
 
     const val FACE =
         "$BASE Describe the people visible. " +

@@ -36,11 +36,22 @@ class CaptureEngine @Inject constructor(
     private fun fireBurst(strategy: ModeStrategy, policy: CapturePolicy.BurstInterval) {
         activeJob?.cancel()
         activeJob = scope.launch {
+            val frames = mutableListOf<android.graphics.Bitmap>()
             repeat(policy.count) { i ->
-                if (!isActive) return@launch
-                val bmp = hardware.captureNow() ?: return@launch
-                strategy.processFrame(bmp)
+                if (!isActive) {
+                    frames.forEach { if (!it.isRecycled) it.recycle() }
+                    return@launch
+                }
+                val bmp = hardware.captureNow()
+                if (bmp == null) {
+                    frames.forEach { if (!it.isRecycled) it.recycle() }
+                    return@launch
+                }
+                frames.add(bmp)
                 if (i < policy.count - 1) delay(policy.intervalMs)
+            }
+            if (frames.isNotEmpty()) {
+                strategy.processFrames(frames)
             }
         }
     }

@@ -193,21 +193,47 @@ fun MainScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Burst progress badge
+            val isBusy = state.isInferring || state.burstProgress != null
+            AnimatedVisibility(
+                visible = state.burstProgress != null,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Surface(
+                    color = Color(0xFFFFAA00),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.padding(bottom = 4.dp)
+                ) {
+                    Text(
+                        "Capturing ${state.burstProgress ?: ""}",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
+                }
+            }
+
             // Capture Button
             Button(
                 onClick = { viewModel.onIntent(MainIntent.Capture) },
                 shape = CircleShape,
                 modifier = Modifier.size(72.dp),
-                enabled = !state.isInferring,
+                enabled = !isBusy,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = modeColor(state.currentMode),
+                    containerColor = if (state.burstProgress != null)
+                        Color(0xFFFFAA00) else modeColor(state.currentMode),
                     contentColor = Color.White,
-                    disabledContainerColor = modeColor(state.currentMode).copy(alpha = 0.6f)
+                    disabledContainerColor = if (state.burstProgress != null)
+                        Color(0xFFFFAA00).copy(alpha = 0.6f)
+                    else modeColor(state.currentMode).copy(alpha = 0.6f)
                 ),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
                 contentPadding = PaddingValues(0.dp)
             ) {
-                if (state.isInferring) {
+                if (isBusy) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(32.dp),
                         color = Color.White,
@@ -293,8 +319,15 @@ fun MainScreen(
                     Spacer(Modifier.height(24.dp))
 
                     val resultText = when (val res = state.lastResult) {
-                        is ModeResult.NarrationText -> res.toString()
+                        is ModeResult.NarrationText -> res.description
+                        is ModeResult.TextRead -> res.text
+                        is ModeResult.NavigationInstruction -> res.instruction
+                        is ModeResult.CurrencyDetected -> "${res.denomination} — ${res.series}"
+                        is ModeResult.PersonRecognized -> "${res.name} (${res.relation})"
+                        is ModeResult.EduContent -> res.content
                         is ModeResult.Error -> "Error: ${res.message}"
+                        is ModeResult.UnknownPerson -> "Unknown person"
+                        is ModeResult.NoResult -> "No result"
                         else -> if (state.isInferring) "Analyzing image..." else "Processing..."
                     }
 

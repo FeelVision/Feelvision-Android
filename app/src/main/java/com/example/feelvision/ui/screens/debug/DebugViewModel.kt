@@ -1,10 +1,12 @@
 package com.feelvision.ui.screens.debug
 
+import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.feelvision.domain.button.ButtonHandler
 import com.feelvision.domain.coordinator.ModeCoordinator
 import com.feelvision.domain.model.AppMode
+import com.feelvision.domain.model.CapturePolicy
 import com.feelvision.domain.model.PhysicalButton
 import com.feelvision.hardware.HardwareSource
 import com.feelvision.inference.GemmaInferenceManager
@@ -21,6 +23,7 @@ data class DebugUiState(
     val logs: List<String>      = emptyList(),
     val isInferring: Boolean    = false,
     val gemmaReady: Boolean     = false,
+    val burstProgress: String?  = null,   // e.g. "3/5" during burst capture
 )
 
 @HiltViewModel
@@ -87,30 +90,98 @@ class DebugViewModel @Inject constructor(
 
     fun clearLogs() = _state.update { it.copy(logs = emptyList()) }
 
+    /**
+     * Mode-aware capture:
+     * - SingleShot modes (Default, OCR, etc.) → capture 1 image → processFrame
+     * - BurstInterval modes (Navigate)        → capture N images at interval → processFrames
+     */
     fun captureNow() {
-        if (_state.value.isInferring) {
-            appendLog("[WARN] Inference already running — ignoring capture")
+        if (_state.value.isInferring || _state.value.burstProgress != null) {
+            appendLog("[WARN] Capture already running — ignoring")
             return
         }
         viewModelScope.launch {
-            appendLog("[CMD] Manual capture requested")
-            val bmp = hardware.captureNow()
-            if (bmp != null) {
-                appendLog("[OK] Frame: ${bmp.width}×${bmp.height}")
-                if (gemma.isReady()) {
-                    appendLog("[CMD] Processing with ${coordinator.activeStrategy.mode} strategy...")
-                    _state.update { it.copy(isInferring = true) }
-                    try {
-                        coordinator.activeStrategy.processFrame(bmp)
-                    } finally {
-                        _state.update { it.copy(isInferring = false) }
-                    }
-                } else {
-                    appendLog("[WARN] Gemma not ready")
+            val strategy = coordinator.activeStrategy
+            val policy   = strategy.capturePolicy
+
+            when (policy) {
+                is CapturePolicy.SingleShot -> executeSingleCapture()
+                is CapturePolicy.BurstInterval -> executeBurstCapture(policy)
+                is CapturePolicy.Continuous -> {
+                    appendLog("[WARN] Continuous mode — use CaptureEngine instead")
+                }
+                is CapturePolicy.None -> {
+                    appendLog("[WARN] Current mode has no capture policy")
+                }
+            }
+        }
+    }
+
+    // ── Single-shot capture (OCR, Default, etc.) ────────────────────────
+
+    private suspend fun executeSingleCapture() {
+        appendLog("[CMD] Single capture requested (${coordinator.activeMode.displayName})")
+        val bmp = hardware.captureNow()
+        if (bmp != null) {
+            appendLog("[OK] Frame: ${bmp.width}×${bmp.height}")
+            if (gemma.isReady()) {
+                appendLog("[CMD] Processing with ${coordinator.activeMode.shortLabel} strategy...")
+                _state.update { it.copy(isInferring = true) }
+                try {
+                    coordinator.activeStrategy.processFrame(bmp)
+                } finally {
+                    _state.update { it.copy(isInferring = false) }
                 }
             } else {
-                appendLog("[ERR] Capture returned null")
+                appendLog("[WARN] Gemma not ready")
             }
+        } else {
+            appendLog("[ERR] Capture returned null")
+        }
+    }
+
+    // ── Burst capture (Navigate) ────────────────────────────────────────
+
+    private suspend fun executeBurstCapture(policy: CapturePolicy.BurstInterval) {
+        appendLog("[CMD] Burst capture: ${policy.count} frames @ ${policy.intervalMs}ms interval")
+
+        val frames = mutableListOf<Bitmap>()
+        _state.update { it.copy(burstProgress = "0/${policy.count}") }
+
+        try {
+            repeat(policy.count) { i ->
+                appendLog("[CMD] Capturing frame ${i + 1}/${policy.count}...")
+                val bmp = hardware.captureNow()
+                if (bmp == null) {
+                    appendLog("[ERR] Burst capture ${i + 1} returned null — aborting")
+                    frames.forEach { if (!it.isRecycled) it.recycle() }
+                    return
+                }
+                frames.add(bmp)
+                _state.update { it.copy(burstProgress = "${i + 1}/${policy.count}") }
+                appendLog("[OK] Frame ${i + 1}: ${bmp.width}×${bmp.height}")
+
+                // Wait between captures (except after the last one)
+                if (i < policy.count - 1) {
+                    kotlinx.coroutines.delay(policy.intervalMs)
+                }
+            }
+
+            appendLog("[CMD] All ${frames.size} frames captured — sending to ${coordinator.activeMode.shortLabel} strategy...")
+            _state.update { it.copy(burstProgress = null, isInferring = true) }
+
+            if (gemma.isReady()) {
+                try {
+                    coordinator.activeStrategy.processFrames(frames)
+                } finally {
+                    _state.update { it.copy(isInferring = false) }
+                }
+            } else {
+                appendLog("[WARN] Gemma not ready — discarding ${frames.size} frames")
+                frames.forEach { if (!it.isRecycled) it.recycle() }
+            }
+        } finally {
+            _state.update { it.copy(burstProgress = null, isInferring = false) }
         }
     }
 

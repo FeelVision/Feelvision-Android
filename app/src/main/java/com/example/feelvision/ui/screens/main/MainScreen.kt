@@ -44,7 +44,6 @@ fun MainScreen(
     showDebugButton: Boolean
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var showModeSwitcher by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // Bind phone camera (even without preview on screen, we need it bound for capture)
@@ -164,20 +163,21 @@ fun MainScreen(
 
             Spacer(Modifier.height(36.dp))
 
-            MicOrb(isListening = state.isListening, modifier = Modifier.size(72.dp))
+            val isListening = state.isListeningForMode
+            MicOrb(isListening = isListening, modifier = Modifier.size(72.dp))
 
             Spacer(Modifier.height(16.dp))
 
             WaveformBar(
                 data = emptyList(),
-                active = state.isListening,
+                active = isListening,
                 modifier = Modifier.width(200.dp).height(32.dp)
             )
 
             Spacer(Modifier.height(24.dp))
 
             Text(
-                state.statusText,
+                if (isListening) "Listening for mode..." else state.statusText,
                 style = MaterialTheme.typography.bodyLarge.copy(
                     color = FVColors.DarkNavy.copy(alpha = 0.65f)
                 )
@@ -221,7 +221,7 @@ fun MainScreen(
                 onClick = { viewModel.onIntent(MainIntent.Capture) },
                 shape = CircleShape,
                 modifier = Modifier.size(72.dp),
-                enabled = !isBusy,
+                enabled = !isBusy && !state.isListeningForMode,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (state.burstProgress != null)
                         Color(0xFFFFAA00) else modeColor(state.currentMode),
@@ -248,32 +248,20 @@ fun MainScreen(
                 }
             }
 
+            // Voice Mode Button
             OutlinedButton(
-                onClick = { showModeSwitcher = true },
+                onClick = { viewModel.onIntent(MainIntent.StartVoiceModeSwitch) },
                 shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.5.dp, FVColors.DeepBlue.copy(alpha = 0.4f)),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = FVColors.DeepBlue)
+                border = BorderStroke(1.5.dp, if (state.isListeningForMode) Color(0xFFE57373) else FVColors.DeepBlue.copy(alpha = 0.4f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (state.isListeningForMode) Color(0xFFE57373) else FVColors.DeepBlue
+                ),
+                enabled = !isBusy
             ) {
-                Icon(Icons.Default.SwapHoriz, null, modifier = Modifier.size(16.dp))
+                Icon(if (state.isListeningForMode) Icons.Default.Mic else Icons.Default.MicNone, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Switch Mode", style = MaterialTheme.typography.labelLarge)
+                Text(if (state.isListeningForMode) "Listening..." else "Switch Mode", style = MaterialTheme.typography.labelLarge)
             }
-        }
-
-        // ── Mode switcher overlay ────────────────────────────────────────
-        AnimatedVisibility(
-            visible = showModeSwitcher,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 4 })
-        ) {
-            ModeSwitcherOverlay(
-                currentMode = state.currentMode,
-                onSelect = { mode ->
-                    viewModel.onIntent(MainIntent.SwitchMode(mode))
-                    showModeSwitcher = false
-                },
-                onDismiss = { showModeSwitcher = false }
-            )
         }
 
         // ── Captured Result Overlay ───────────────────────────────────────
@@ -351,80 +339,6 @@ fun MainScreen(
                         "Tap anywhere to dismiss",
                         style = MaterialTheme.typography.labelSmall.copy(color = Color.White.copy(alpha = 0.4f))
                     )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModeSwitcherOverlay(
-    currentMode: AppMode,
-    onSelect: (AppMode) -> Unit,
-    onDismiss: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(FVColors.DarkNavy.copy(alpha = 0.93f))
-            .clickable(onClick = onDismiss)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(Modifier.height(64.dp))
-            Text("Select Mode",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    color = FVColors.White, fontWeight = FontWeight.Bold))
-            Spacer(Modifier.height(4.dp))
-            Text("Press B to cycle  ·  Tap a row",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    color = FVColors.White.copy(alpha = 0.4f)))
-            Spacer(Modifier.height(28.dp))
-
-            AppMode.entries.forEach { mode ->
-                val isActive = mode == currentMode
-                val color = modeColor(mode)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (isActive) color.copy(alpha = 0.18f)
-                            else FVColors.White.copy(alpha = 0.05f)
-                        )
-                        .border(
-                            width = if (isActive) 1.dp else 0.dp,
-                            color = if (isActive) color else Color.Transparent,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .clickable { onSelect(mode) }
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(color.copy(alpha = 0.22f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(mode.id.toString(),
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                color = color, fontWeight = FontWeight.Bold))
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Text(mode.displayName,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            color = FVColors.White,
-                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal),
-                        modifier = Modifier.weight(1f))
-                    if (isActive) Icon(Icons.Default.Check, null,
-                        tint = color, modifier = Modifier.size(18.dp))
                 }
             }
         }

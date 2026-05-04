@@ -12,6 +12,8 @@ import com.feelvision.hardware.HardwareSource
 import com.feelvision.inference.GemmaInferenceManager
 import com.feelvision.logging.DebugLogBus
 import com.feelvision.logging.DebugLogType
+import com.feelvision.speech.SpeechRecognitionManager
+import com.feelvision.tts.TTSManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -24,6 +26,7 @@ data class DebugUiState(
     val isInferring: Boolean    = false,
     val gemmaReady: Boolean     = false,
     val burstProgress: String?  = null,   // e.g. "3/5" during burst capture
+    val isListeningForMode: Boolean = false,
 )
 
 @HiltViewModel
@@ -32,7 +35,9 @@ class DebugViewModel @Inject constructor(
     private val hardware: HardwareSource,
     private val buttonHandler: ButtonHandler,
     private val debugLogBus: DebugLogBus,
-    private val gemma: GemmaInferenceManager
+    private val gemma: GemmaInferenceManager,
+    private val speechRecognizer: SpeechRecognitionManager,
+    private val tts: TTSManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DebugUiState())
@@ -74,6 +79,17 @@ class DebugViewModel @Inject constructor(
                 kotlinx.coroutines.delay(1_000)
             }
         }
+        // Listen to speech recognition results
+        viewModelScope.launch {
+            speechRecognizer.isListening.collect { listening ->
+                _state.update { it.copy(isListeningForMode = listening) }
+            }
+        }
+        viewModelScope.launch {
+            speechRecognizer.error.collect { error ->
+                appendLog("[ERR] Speech recognition: $error")
+            }
+        }
     }
 
     fun triggerMode(mode: AppMode) {
@@ -89,6 +105,11 @@ class DebugViewModel @Inject constructor(
     }
 
     fun clearLogs() = _state.update { it.copy(logs = emptyList()) }
+
+    fun startVoiceModeSwitch() {
+        appendLog("[CMD] Voice mode switch activated...")
+        speechRecognizer.startListening()
+    }
 
     /**
      * Mode-aware capture:

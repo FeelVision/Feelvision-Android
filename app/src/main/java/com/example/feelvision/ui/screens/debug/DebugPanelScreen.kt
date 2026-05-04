@@ -2,6 +2,7 @@
 
     import androidx.camera.core.Preview
     import androidx.camera.view.PreviewView
+    import androidx.compose.animation.core.*
     import androidx.compose.foundation.*
     import androidx.compose.foundation.layout.*
     import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +18,7 @@
     import androidx.compose.ui.Alignment
     import androidx.compose.ui.Modifier
     import androidx.compose.ui.draw.clip
+    import androidx.compose.ui.draw.scale
     import androidx.compose.ui.graphics.Color
     import androidx.compose.ui.platform.LocalLifecycleOwner
     import androidx.compose.ui.text.font.FontFamily
@@ -222,51 +224,48 @@
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // ── Mode trigger grid ────────────────────────────────────
-                DebugSectionLabel("TRIGGER MODE")
-                LazyVerticalGrid(
-                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(4),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.height(96.dp)
+                // ── Active Mode Badge ────────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(FVColors.DebugSurface)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    AppMode.entries.forEach { mode ->
-                        item {
-                            val active = mode == state.currentMode
-                            val color  = modeColor(mode)
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (active) color.copy(0.2f) else FVColors.DebugSurface)
-                                    .border(
-                                        1.dp,
-                                        if (active) color else FVColors.DebugAccent.copy(0.15f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable { viewModel.triggerMode(mode) }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        mode.id.toString(),
-                                        style = MaterialTheme.typography.labelLarge.copy(
-                                            color = if (active) color else FVColors.DebugText,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    )
-                                    Text(
-                                        mode.shortLabel,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            color = FVColors.DebugAccent.copy(0.6f),
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 9.sp
-                                        )
-                                    )
-                                }
-                            }
-                        }
+                    Text(
+                        "ACTIVE MODE:",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = FVColors.DebugAccent.copy(alpha = 0.5f),
+                            fontFamily = FontFamily.Monospace
+                        )
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        state.currentMode.displayName.uppercase(),
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            color = modeColor(state.currentMode),
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    )
+                    
+                    if (state.isListeningForMode) {
+                        Spacer(Modifier.weight(1f))
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = null,
+                            tint = Color(0xFFE57373),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "LISTENING...",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = Color(0xFFE57373),
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
                     }
                 }
 
@@ -279,10 +278,11 @@
                         modifier = Modifier.weight(1f)
                     )
                     DebugButtonGroup(
-                        "B", "Mode",
+                        "B", "Voice Mode",
                         onShort = { viewModel.simulateButton(PhysicalButton.B) },
                         onLong  = { viewModel.simulateButton(PhysicalButton.B, "long") },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        isActive = state.isListeningForMode
                     )
                     DebugButtonGroup(
                         "C", "System",
@@ -345,7 +345,8 @@
         onShort: () -> Unit,
         onLong: (() -> Unit)?   = null,
         onDouble: (() -> Unit)? = null,
-        modifier: Modifier = Modifier
+        modifier: Modifier = Modifier,
+        isActive: Boolean = false
     ) {
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
@@ -360,11 +361,14 @@
                 onClick = onShort,
                 modifier = Modifier.fillMaxWidth().height(34.dp),
                 shape = RoundedCornerShape(6.dp),
-                border = BorderStroke(1.dp, FVColors.DebugAccent.copy(0.4f)),
+                border = BorderStroke(1.dp, if (isActive) Color(0xFFE57373) else FVColors.DebugAccent.copy(0.4f)),
                 contentPadding = PaddingValues(0.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = FVColors.DebugAccent)
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (isActive) Color.White else FVColors.DebugAccent,
+                    containerColor = if (isActive) Color(0xFFE57373) else Color.Transparent
+                )
             ) {
-                Text("SHORT", style = MaterialTheme.typography.labelSmall.copy(
+                Text(if (isActive) "LISTEN" else "SHORT", style = MaterialTheme.typography.labelSmall.copy(
                     fontFamily = FontFamily.Monospace))
             }
             if (onLong != null) {

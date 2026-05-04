@@ -15,6 +15,7 @@ import com.feelvision.tts.TTSManager
 import com.feelvision.domain.button.ButtonHandler
 import com.feelvision.domain.model.PhysicalButton
 import com.feelvision.inference.GemmaInferenceManager
+import com.feelvision.speech.SpeechRecognitionManager
 
 import android.graphics.Bitmap
 
@@ -28,6 +29,7 @@ data class MainUiState(
     val gemmaReady: Boolean = false,
     val capturedBitmap: Bitmap? = null,
     val burstProgress: String? = null,   // e.g. "3/5" during burst capture
+    val isListeningForMode: Boolean = false,
 )
 
 sealed class MainIntent {
@@ -35,6 +37,7 @@ sealed class MainIntent {
     data object Capture : MainIntent()
     data object ScanModel : MainIntent()
     data object DismissResult : MainIntent()
+    data object StartVoiceModeSwitch : MainIntent()
 }
 
 @HiltViewModel
@@ -43,7 +46,8 @@ class MainViewModel @Inject constructor(
     private val hardware: HardwareSource,
     private val tts: TTSManager,
     private val buttonHandler: ButtonHandler,
-    private val gemma: GemmaInferenceManager
+    private val gemma: GemmaInferenceManager,
+    private val speechRecognizer: SpeechRecognitionManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(MainUiState())
@@ -65,6 +69,12 @@ class MainViewModel @Inject constructor(
             while (true) {
                 _state.update { it.copy(gemmaReady = gemma.isReady()) }
                 kotlinx.coroutines.delay(1_000)
+            }
+        }
+        // Sync listening state
+        viewModelScope.launch {
+            speechRecognizer.isListening.collect { listening ->
+                _state.update { it.copy(isListeningForMode = listening) }
             }
         }
     }
@@ -100,6 +110,10 @@ class MainViewModel @Inject constructor(
             is MainIntent.DismissResult -> {
                 _state.value.capturedBitmap?.recycle()
                 _state.update { it.copy(capturedBitmap = null, lastResult = null) }
+            }
+            is MainIntent.StartVoiceModeSwitch -> {
+                tts.speak("Which mode?")
+                speechRecognizer.startListening()
             }
         }
     }

@@ -306,17 +306,22 @@ fun MainScreen(
 
                     Spacer(Modifier.height(24.dp))
 
-                    val resultText = when (val res = state.lastResult) {
-                        is ModeResult.NarrationText -> res.description
-                        is ModeResult.TextRead -> res.text
-                        is ModeResult.NavigationInstruction -> res.instruction
-                        is ModeResult.CurrencyDetected -> "${res.denomination} — ${res.series}"
-                        is ModeResult.PersonRecognized -> "${res.name} (${res.relation})"
-                        is ModeResult.EduContent -> res.content
-                        is ModeResult.Error -> "Error: ${res.message}"
-                        is ModeResult.UnknownPerson -> "Unknown person"
-                        is ModeResult.NoResult -> "No result"
-                        else -> if (state.isInferring) "Analyzing image..." else "Processing..."
+                    val resultText = when {
+                        // Show streaming text while inference is in progress
+                        state.isInferring && state.streamingText.isNotEmpty() -> state.streamingText
+                        state.isInferring -> "Analyzing image..."
+                        else -> when (val res = state.lastResult) {
+                            is ModeResult.NarrationText -> res.description
+                            is ModeResult.TextRead -> res.text
+                            is ModeResult.NavigationInstruction -> res.instruction
+                            is ModeResult.CurrencyDetected -> "${res.denomination} — ${res.series}"
+                            is ModeResult.PersonRecognized -> "${res.name} (${res.relation})"
+                            is ModeResult.EduContent -> res.content
+                            is ModeResult.Error -> "Error: ${res.message}"
+                            is ModeResult.UnknownPerson -> "Unknown person"
+                            is ModeResult.NoResult -> "No result"
+                            else -> "Processing..."
+                        }
                     }
 
                     Surface(

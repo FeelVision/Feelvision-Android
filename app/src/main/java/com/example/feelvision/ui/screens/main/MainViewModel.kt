@@ -30,6 +30,7 @@ data class MainUiState(
     val capturedBitmap: Bitmap? = null,
     val burstProgress: String? = null,   // e.g. "3/5" during burst capture
     val isListeningForMode: Boolean = false,
+    val streamingText: String = "",       // incrementally built text during streaming inference
 )
 
 sealed class MainIntent {
@@ -109,7 +110,7 @@ class MainViewModel @Inject constructor(
             is MainIntent.ScanModel -> viewModelScope.launch { gemma.initialize() }
             is MainIntent.DismissResult -> {
                 _state.value.capturedBitmap?.recycle()
-                _state.update { it.copy(capturedBitmap = null, lastResult = null) }
+                _state.update { it.copy(capturedBitmap = null, lastResult = null, streamingText = "") }
             }
             is MainIntent.StartVoiceModeSwitch -> {
                 tts.speak("Which mode?")
@@ -121,19 +122,19 @@ class MainViewModel @Inject constructor(
     // ── Single-shot capture (Default, OCR, Currency, etc.) ──────────────
 
     private suspend fun executeSingleCapture() {
-        _state.update { it.copy(isInferring = true, statusText = "Capturing...", capturedBitmap = null) }
+        _state.update { it.copy(isInferring = true, statusText = "Capturing...", capturedBitmap = null, streamingText = "") }
         val bmp = hardware.captureNow()
         if (bmp != null) {
             // Create a copy for the UI to prevent crash if strategy recycles original
             val displayBmp = bmp.copy(bmp.config ?: Bitmap.Config.ARGB_8888, true)
             _state.update { it.copy(statusText = "Analyzing...", capturedBitmap = displayBmp) }
             try {
-                val result = coordinator.activeStrategy.processFrame(bmp)
+                val result = coordinator.activeStrategy.processFrameStreaming(bmp) { chunk ->
+                    _state.update { it.copy(streamingText = it.streamingText + chunk + " ") }
+                }
                 _state.update { it.copy(lastResult = result, statusText = "Ready") }
             } catch (e: Exception) {
                 _state.update { it.copy(statusText = "Analysis failed") }
-            } finally {
-                if (!bmp.isRecycled) bmp.recycle()
             }
         } else {
             _state.update { it.copy(statusText = "Capture failed") }
@@ -148,7 +149,8 @@ class MainViewModel @Inject constructor(
         _state.update { it.copy(
             burstProgress = "0/${policy.count}",
             statusText = "Burst capturing...",
-            capturedBitmap = null
+            capturedBitmap = null,
+            streamingText = ""
         ) }
 
         try {
@@ -176,7 +178,7 @@ class MainViewModel @Inject constructor(
                 }
             }
 
-            // All frames captured — now infer
+            // All frames captured — now infer with streaming
             _state.update { it.copy(
                 burstProgress = null,
                 isInferring = true,
@@ -184,7 +186,9 @@ class MainViewModel @Inject constructor(
             ) }
 
             try {
-                val result = coordinator.activeStrategy.processFrames(frames)
+                val result = coordinator.activeStrategy.processFramesStreaming(frames) { chunk ->
+                    _state.update { it.copy(streamingText = it.streamingText + chunk + " ") }
+                }
                 _state.update { it.copy(lastResult = result, statusText = "Ready") }
             } catch (e: Exception) {
                 _state.update { it.copy(statusText = "Analysis failed") }

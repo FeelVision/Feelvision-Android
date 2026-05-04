@@ -33,6 +33,13 @@ class EducationStrategy @Inject constructor(
     }
 
     override suspend fun processFrame(bitmap: Bitmap): ModeResult {
+        return processFrameStreaming(bitmap) { /* no UI callback when called via processFrame */ }
+    }
+
+    override suspend fun processFrameStreaming(
+        bitmap: Bitmap,
+        onChunk: suspend (String) -> Unit
+    ): ModeResult {
         if (bitmap.isRecycled || bitmap.width == 0 || bitmap.height == 0) {
             log.log(DebugLogType.ERROR, "EDU", "Invalid bitmap")
             return ModeResult.Error("Invalid bitmap")
@@ -51,35 +58,60 @@ class EducationStrategy @Inject constructor(
             }
 
             log.log(DebugLogType.INFERENCE, "EDU",
-                "Processing single frame ${bitmap.width}×${bitmap.height}")
+                "Calling gemma.generateStream — streaming mode")
 
-            when (val result = gemma.generate(
+            val sentenceBuffer = StringBuilder()
+            val fullText = StringBuilder()
+            var hadError: InferenceResult.Failure? = null
+
+            gemma.generateStream(
                 prompt           = "Explain what you see in this image in an educational way.",
                 images           = listOf(bitmap),
                 baseSystemPrompt = ModePrompts.EDU,
                 modeTag          = "EDU",
                 responseLanguage = language
-            )) {
-                is InferenceResult.Success -> {
-                    log.log(DebugLogType.OK, "EDU", "Education: ${result.text.take(80)}...")
-                    tts.speak(result.text)
-                    ModeResult.EduContent(result.text)
+            ).collect { result ->
+                when (result) {
+                    is InferenceResult.Streaming -> {
+                        fullText.append(result.partial)
+                        sentenceBuffer.append(result.partial)
+                        val text = sentenceBuffer.toString()
+                        val lastBoundary = text.lastIndexOfAny(charArrayOf('.', '!', '?', '\n'))
+                        if (lastBoundary >= 0) {
+                            val toSpeak = text.substring(0, lastBoundary + 1).trim()
+                            if (toSpeak.isNotEmpty()) {
+                                tts.speakChunk(toSpeak)
+                                onChunk(toSpeak)
+                            }
+                            sentenceBuffer.clear()
+                            sentenceBuffer.append(text.substring(lastBoundary + 1))
+                        }
+                    }
+                    is InferenceResult.Failure -> { hadError = result }
+                    is InferenceResult.NotReady -> { hadError = InferenceResult.Failure("Not ready") }
+                    else -> {}
                 }
-                is InferenceResult.Failure -> {
-                    log.log(DebugLogType.ERROR, "EDU", "generate() failed: ${result.error}")
-                    tts.speak("I could not explain what I see.")
-                    ModeResult.Error(result.error)
-                }
-                is InferenceResult.NotReady -> {
-                    log.log(DebugLogType.WARN, "EDU", "NotReady returned from generate()")
-                    tts.speak("Model not ready.")
-                    ModeResult.Error("Not ready")
-                }
-                else -> ModeResult.NoResult
+            }
+
+            val remaining = sentenceBuffer.toString().trim()
+            if (remaining.isNotEmpty()) {
+                tts.speakChunk(remaining)
+                onChunk(remaining)
+            }
+
+            if (hadError != null) {
+                log.log(DebugLogType.ERROR, "EDU", "stream failed: ${hadError!!.error}")
+                tts.speak("I could not explain what I see.")
+                ModeResult.Error(hadError!!.error)
+            } else if (fullText.isNotEmpty()) {
+                ModeResult.EduContent(fullText.toString().trim())
+            } else {
+                tts.speak("I could not explain what I see.")
+                ModeResult.Error("Empty response")
             }
         } catch (e: Exception) {
             log.log(DebugLogType.ERROR, "EDU",
-                "processFrame CRASHED: ${e.javaClass.simpleName}: ${e.message}")
+                "processFrameStreaming CRASHED: ${e.javaClass.simpleName}: ${e.message}")
             tts.speak("Something went wrong in education mode.")
             ModeResult.Error(e.message ?: "Unknown error")
         } finally {

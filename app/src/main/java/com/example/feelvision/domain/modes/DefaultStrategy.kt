@@ -33,6 +33,13 @@ class DefaultStrategy @Inject constructor(
     }
 
     override suspend fun processFrame(bitmap: Bitmap): ModeResult {
+        return processFrameStreaming(bitmap) { /* no UI callback when called via processFrame */ }
+    }
+
+    override suspend fun processFrameStreaming(
+        bitmap: Bitmap,
+        onChunk: suspend (String) -> Unit
+    ): ModeResult {
         if (bitmap.isRecycled || bitmap.width == 0 || bitmap.height == 0) {
             log.log(DebugLogType.ERROR, "DEFAULT", "Invalid bitmap")
             return ModeResult.Error("Invalid bitmap")
@@ -50,38 +57,63 @@ class DefaultStrategy @Inject constructor(
                 return ModeResult.Error("Model not ready")
             }
 
-            // ← Log BEFORE calling generate so you can see exactly where it dies
             log.log(DebugLogType.INFERENCE, "DEFAULT",
-                "Calling gemma.generate — engine should be ready")
+                "Calling gemma.generateStream — streaming mode")
 
-            when (val result = gemma.generate(
+            val sentenceBuffer = StringBuilder()
+            val fullText = StringBuilder()
+            var hadError: InferenceResult.Failure? = null
+
+            gemma.generateStream(
                 prompt           = "abcd",
                 images           = listOf(bitmap),
                 baseSystemPrompt = ModePrompts.DEFAULT,
                 modeTag          = "DEFAULT",
                 responseLanguage = language
-            )) {
-                is InferenceResult.Success -> {
-                    tts.speak(result.text)
-                    ModeResult.NarrationText(result.text)
+            ).collect { result ->
+                when (result) {
+                    is InferenceResult.Streaming -> {
+                        fullText.append(result.partial)
+                        sentenceBuffer.append(result.partial)
+                        // Flush on sentence boundary
+                        val text = sentenceBuffer.toString()
+                        val lastBoundary = text.lastIndexOfAny(charArrayOf('.', '!', '?', '\n'))
+                        if (lastBoundary >= 0) {
+                            val toSpeak = text.substring(0, lastBoundary + 1).trim()
+                            if (toSpeak.isNotEmpty()) {
+                                tts.speakChunk(toSpeak)
+                                onChunk(toSpeak)
+                            }
+                            sentenceBuffer.clear()
+                            sentenceBuffer.append(text.substring(lastBoundary + 1))
+                        }
+                    }
+                    is InferenceResult.Failure -> { hadError = result }
+                    is InferenceResult.NotReady -> { hadError = InferenceResult.Failure("Not ready") }
+                    else -> { /* Success is not emitted during stream */ }
                 }
-                is InferenceResult.Failure -> {
-                    // ← This log tells you the crash happened inside generate()
-                    log.log(DebugLogType.ERROR, "DEFAULT", "generate() failed: ${result.error}")
-                    tts.speak("I could not describe what I see.")
-                    ModeResult.Error(result.error)
-                }
-                is InferenceResult.NotReady -> {
-                    log.log(DebugLogType.WARN, "DEFAULT", "NotReady returned from generate()")
-                    tts.speak("Model not ready.")
-                    ModeResult.Error("Not ready")
-                }
-                else -> ModeResult.NoResult
+            }
+
+            // Flush remaining buffer
+            val remaining = sentenceBuffer.toString().trim()
+            if (remaining.isNotEmpty()) {
+                tts.speakChunk(remaining)
+                onChunk(remaining)
+            }
+
+            if (hadError != null) {
+                log.log(DebugLogType.ERROR, "DEFAULT", "stream failed: ${hadError!!.error}")
+                tts.speak("I could not describe what I see.")
+                ModeResult.Error(hadError!!.error)
+            } else if (fullText.isNotEmpty()) {
+                ModeResult.NarrationText(fullText.toString().trim())
+            } else {
+                tts.speak("I could not describe what I see.")
+                ModeResult.Error("Empty response")
             }
         } catch (e: Exception) {
-            // ← Catches anything generate() throws that isn't caught internally
             log.log(DebugLogType.ERROR, "DEFAULT",
-                "processFrame CRASHED: ${e.javaClass.simpleName}: ${e.message}")
+                "processFrameStreaming CRASHED: ${e.javaClass.simpleName}: ${e.message}")
             tts.speak("Something went wrong.")
             ModeResult.Error(e.message ?: "Unknown error")
         } finally {

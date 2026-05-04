@@ -4,6 +4,7 @@ import com.feelvision.di.ApplicationScope
 import com.feelvision.domain.model.CapturePolicy
 import com.feelvision.domain.modes.ModeStrategy
 import com.feelvision.hardware.HardwareSource
+import com.feelvision.inference.GemmaInferenceManager
 import kotlinx.coroutines.*
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -11,6 +12,7 @@ import javax.inject.Singleton
 @Singleton
 class CaptureEngine @Inject constructor(
     private val hardware: HardwareSource,
+    private val gemma: GemmaInferenceManager,
     @ApplicationScope private val scope: CoroutineScope
 ) {
     private var activeJob: Job? = null
@@ -25,8 +27,21 @@ class CaptureEngine @Inject constructor(
         }
     }
 
+    /**
+     * Cancel the previous job by first stopping native inference via
+     * conversation.cancelProcess(), then cancelling the coroutine.
+     */
+    private fun cancelActive() {
+        activeJob?.let {
+            if (it.isActive) {
+                gemma.cancelInference()   // tells native layer to stop NOW
+                it.cancel()               // cancel the coroutine
+            }
+        }
+    }
+
     private fun fireSingle(strategy: ModeStrategy) {
-        activeJob?.cancel()
+        cancelActive()
         activeJob = scope.launch {
             val bmp = hardware.captureNow() ?: return@launch
             strategy.processFrameStreaming(bmp) { /* TTS handled inside strategy */ }
@@ -34,7 +49,7 @@ class CaptureEngine @Inject constructor(
     }
 
     private fun fireBurst(strategy: ModeStrategy, policy: CapturePolicy.BurstInterval) {
-        activeJob?.cancel()
+        cancelActive()
         activeJob = scope.launch {
             val frames = mutableListOf<android.graphics.Bitmap>()
             repeat(policy.count) { i ->
@@ -57,7 +72,7 @@ class CaptureEngine @Inject constructor(
     }
 
     fun startContinuous(strategy: ModeStrategy, policy: CapturePolicy.Continuous) {
-        activeJob?.cancel()
+        cancelActive()
         activeJob = scope.launch {
             while (isActive) {
                 val bmp = hardware.captureNow()
@@ -67,6 +82,6 @@ class CaptureEngine @Inject constructor(
         }
     }
 
-    fun cancelBurst() { activeJob?.cancel(); activeJob = null }
-    fun stop()        { activeJob?.cancel(); activeJob = null }
+    fun cancelBurst() { cancelActive(); activeJob = null }
+    fun stop()        { cancelActive(); activeJob = null }
 }

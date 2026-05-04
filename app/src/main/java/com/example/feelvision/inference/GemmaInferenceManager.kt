@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import com.feelvision.logging.DebugLogBus
 import com.feelvision.logging.DebugLogType
 import com.google.ai.edge.litertlm.*
+import kotlin.coroutines.cancellation.CancellationException
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -228,6 +229,10 @@ class GemmaInferenceManager @Inject constructor(
                     "OOM during inference — requestId=$requestId", requestId)
                 System.gc()
                 InferenceResult.Failure("Out of memory", RuntimeException(e))
+            } catch (e: CancellationException) {
+                debugLogBus.log(DebugLogType.WARN, modeTag,
+                    "Inference cancelled — requestId=$requestId", requestId)
+                InferenceResult.Failure("Cancelled")
             } catch (e: Exception) {
                 debugLogBus.log(
                     DebugLogType.ERROR, modeTag,
@@ -318,6 +323,10 @@ class GemmaInferenceManager @Inject constructor(
                     "OOM in stream — requestId=$requestId", requestId)
                 System.gc()
                 emit(InferenceResult.Failure("Out of memory", RuntimeException(e)))
+            } catch (e: CancellationException) {
+                debugLogBus.log(DebugLogType.WARN, modeTag,
+                    "Stream cancelled — requestId=$requestId", requestId)
+                emit(InferenceResult.Failure("Cancelled"))
             } catch (e: Exception) {
                 debugLogBus.log(
                     DebugLogType.ERROR, modeTag,
@@ -426,6 +435,23 @@ class GemmaInferenceManager @Inject constructor(
     }
 
     // ── Public state ──────────────────────────────────────────────────
+
+    /**
+     * Cancel any in-flight native inference.  Safe to call from any thread.
+     * No-op if nothing is running or the conversation is already closed.
+     */
+    fun cancelInference() {
+        try {
+            val conv = conversation
+            if (conv != null && conv.isAlive) {
+                conv.cancelProcess()
+                debugLogBus.log(DebugLogType.INFO, "GEMMA", "cancelProcess() called")
+            }
+        } catch (e: Exception) {
+            debugLogBus.log(DebugLogType.WARN, "GEMMA",
+                "cancelProcess() failed: ${e.message}")
+        }
+    }
 
     fun isReady(): Boolean = isInitialized && engine != null && conversation != null
 

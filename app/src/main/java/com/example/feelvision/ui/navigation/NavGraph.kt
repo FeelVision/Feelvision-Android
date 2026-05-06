@@ -10,6 +10,7 @@ import com.feelvision.ui.screens.people.EnrollScreen
 import com.feelvision.ui.screens.people.PeopleScreen
 import com.feelvision.ui.screens.settings.SettingsScreen
 import com.feelvision.ui.screens.splash.SplashScreen
+import com.feelvision.ui.screens.luckfox.LuckfoxScreen
 import com.feelvision.hardware.PhoneCameraSource
 
 sealed class Screen(val route: String) {
@@ -21,6 +22,7 @@ sealed class Screen(val route: String) {
         fun route(id: Long = -1L) = "enroll/$id"
     }
     data object Debug : Screen("debug")
+    data object Luckfox : Screen("luckfox")
 }
 
 @Composable
@@ -50,7 +52,14 @@ fun NavGraph(
         }
 
         composable(Screen.Settings.route) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToLuckfox = { navController.navigate(Screen.Luckfox.route) }
+            )
+        }
+
+        composable(Screen.Luckfox.route) {
+            LuckfoxScreen(onNavigateBack = { navController.popBackStack() })
         }
 
         composable(Screen.People.route) {

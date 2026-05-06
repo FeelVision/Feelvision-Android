@@ -36,7 +36,10 @@ class ButtonHandler @Inject constructor(
         }
     }
 
+    var isLuckfoxActive: Boolean = false
+
     private fun handle(event: ButtonEvent) {
+        if (isLuckfoxActive) return
         scope.launch {
             when (event) {
                 is ButtonEvent.ShortPress -> when (event.button) {

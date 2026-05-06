@@ -49,8 +49,4 @@ class SettingsViewModel @Inject constructor(
     fun setHaptic(v: Boolean) = viewModelScope.launch { repo.setHaptic(v) }
     fun setAnnounceMode(v: Boolean) = viewModelScope.launch { repo.setAnnounceMode(v) }
     fun setDebug(v: Boolean) = viewModelScope.launch { repo.setDebug(v) }
-    
-    fun openPairing() {
-        // To be implemented
-    }
 }

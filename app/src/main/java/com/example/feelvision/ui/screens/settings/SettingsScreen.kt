@@ -25,7 +25,8 @@ import com.feelvision.ui.theme.FVColors
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToLuckfox: () -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -107,7 +108,7 @@ fun SettingsScreen(
                         icon = Icons.Default.Bluetooth,
                         iconTint = if (state.devicePaired) FVColors.LeafGreen
                                    else FVColors.DeepBlue,
-                        onClick = { viewModel.openPairing() }
+                        onClick = onNavigateToLuckfox
                     )
                 }
             }

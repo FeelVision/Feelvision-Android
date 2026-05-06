@@ -13,7 +13,6 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.feelvision.tts.TTSManager
 import com.feelvision.domain.button.ButtonHandler
-import com.feelvision.domain.model.PhysicalButton
 import com.feelvision.inference.GemmaInferenceManager
 import com.feelvision.speech.SpeechRecognitionManager
 
@@ -65,17 +64,20 @@ class MainViewModel @Inject constructor(
                 _state.update { it.copy(luckfoxConnected = !status.contains("Debug")) }
             }
         }
+        // Sync listening state
+        viewModelScope.launch {
+            speechRecognizer.isListening.collect { listening ->
+                _state.update { it.copy(isListeningForMode = listening) }
+            }
+        }
+
+        viewModelScope.launch { gemma.initialize() }
+
         // Sync model ready state
         viewModelScope.launch {
             while (true) {
                 _state.update { it.copy(gemmaReady = gemma.isReady()) }
                 kotlinx.coroutines.delay(1_000)
-            }
-        }
-        // Sync listening state
-        viewModelScope.launch {
-            speechRecognizer.isListening.collect { listening ->
-                _state.update { it.copy(isListeningForMode = listening) }
             }
         }
     }
@@ -107,6 +109,7 @@ class MainViewModel @Inject constructor(
                     }
                 }
             }
+
             is MainIntent.ScanModel -> viewModelScope.launch { gemma.initialize() }
             is MainIntent.DismissResult -> {
                 _state.value.capturedBitmap?.recycle()

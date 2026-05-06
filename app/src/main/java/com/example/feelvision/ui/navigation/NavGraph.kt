@@ -24,7 +24,11 @@ sealed class Screen(val route: String) {
 }
 
 @Composable
-fun NavGraph(navController: NavHostController, showDebug: Boolean, cameraSource: PhoneCameraSource) {
+fun NavGraph(
+    navController: NavHostController,
+    showDebug: Boolean,
+    cameraSource: PhoneCameraSource
+) {
     NavHost(navController, startDestination = Screen.Splash.route) {
 
         composable(Screen.Splash.route) {
@@ -57,10 +61,14 @@ fun NavGraph(navController: NavHostController, showDebug: Boolean, cameraSource:
         }
 
         composable(
-            Screen.Enroll.route,
+            route = Screen.Enroll.route,
             arguments = listOf(navArgument("personId") { type = NavType.LongType })
-        ) {
+        ) { backStackEntry ->
+            // Extract the personId from navigation arguments
+            val personId = backStackEntry.arguments?.getLong("personId") ?: -1L
+
             EnrollScreen(
+                personId = personId,
                 cameraSource = cameraSource,
                 onBack = { navController.popBackStack() }
             )

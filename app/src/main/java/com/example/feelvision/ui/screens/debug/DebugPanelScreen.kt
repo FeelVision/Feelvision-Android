@@ -280,7 +280,6 @@
                     DebugButtonGroup(
                         "B", "Voice Mode",
                         onShort = { viewModel.simulateButton(PhysicalButton.B) },
-                        onLong  = { viewModel.simulateButton(PhysicalButton.B, "long") },
                         modifier = Modifier.weight(1f),
                         isActive = state.isListeningForMode
                     )

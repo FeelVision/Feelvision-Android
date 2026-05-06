@@ -17,6 +17,7 @@ import com.feelvision.inference.GemmaInferenceManager
 import com.feelvision.speech.SpeechRecognitionManager
 
 import android.graphics.Bitmap
+import androidx.compose.ui.platform.debugInspectorInfo
 
 data class MainUiState(
     val currentMode: AppMode = AppMode.Default,
@@ -68,6 +69,13 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             speechRecognizer.isListening.collect { listening ->
                 _state.update { it.copy(isListeningForMode = listening) }
+            }
+        }
+
+        // Sync speech recognition errors
+        viewModelScope.launch {
+            speechRecognizer.error.collect { errorMsg ->
+                _state.update { it.copy(statusText = "Speech error: $errorMsg") }
             }
         }
 

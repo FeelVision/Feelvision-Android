@@ -123,7 +123,9 @@ class SpeechRecognitionManager @Inject constructor(
 
     fun stopListening() {
         mainScope.launch {
-            speechRecognizer.stopListening()
+            if (_isListening.value) {
+                speechRecognizer.stopListening()
+            }
             _isListening.value = false
         }
     }
@@ -137,7 +139,9 @@ class SpeechRecognitionManager @Inject constructor(
         val result = withTimeoutOrNull(timeoutMs) {
             promptResults.first()
         }
-        stopListening()
+        if (result == null) {
+            stopListening()
+        }
         result
     }
 

@@ -18,5 +18,5 @@ class FaceRecStrategy @Inject constructor(
     override val capturePolicy = CapturePolicy.Continuous(intervalMs = 3_000L)
     override fun activate()    { tts.speak("People mode. Coming in next update."); log.log(DebugLogType.MODE,"FACE","Stub activated") }
     override fun deactivate()  { }
-    override suspend fun processFrame(bitmap: Bitmap) = ModeResult.NoResult
+    override suspend fun processFrame(bitmap: Bitmap, userPrompt: String?) = ModeResult.NoResult
 }

@@ -10,15 +10,15 @@ interface ModeStrategy {
     val capturePolicy: CapturePolicy
     fun activate()
     fun deactivate()
-    suspend fun processFrame(bitmap: Bitmap): ModeResult
+    suspend fun processFrame(bitmap: Bitmap, userPrompt: String? = null): ModeResult
 
     /**
      * Process multiple frames collected by a burst capture.
      * Default implementation delegates to processFrame with the last frame.
      * Override in strategies that benefit from multi-image context (e.g. Navigate).
      */
-    suspend fun processFrames(bitmaps: List<Bitmap>): ModeResult {
-        return processFrame(bitmaps.last())
+    suspend fun processFrames(bitmaps: List<Bitmap>, userPrompt: String? = null): ModeResult {
+        return processFrame(bitmaps.last(), userPrompt)
     }
 
     /**
@@ -28,9 +28,10 @@ interface ModeStrategy {
      */
     suspend fun processFrameStreaming(
         bitmap: Bitmap,
+        userPrompt: String? = null,
         onChunk: suspend (String) -> Unit
     ): ModeResult {
-        return processFrame(bitmap)
+        return processFrame(bitmap, userPrompt)
     }
 
     /**
@@ -39,8 +40,9 @@ interface ModeStrategy {
      */
     suspend fun processFramesStreaming(
         bitmaps: List<Bitmap>,
+        userPrompt: String? = null,
         onChunk: suspend (String) -> Unit
     ): ModeResult {
-        return processFrames(bitmaps)
+        return processFrames(bitmaps, userPrompt)
     }
 }

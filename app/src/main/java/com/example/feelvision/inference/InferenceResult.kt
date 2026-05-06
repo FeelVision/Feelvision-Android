@@ -5,4 +5,6 @@ sealed class InferenceResult {
     data class  Streaming(val partial: String) : InferenceResult()
     data class  Failure  (val error: String, val cause: Throwable? = null) : InferenceResult()
     data object NotReady : InferenceResult()
+
+    data class Cancelled (val text: String): InferenceResult()
 }

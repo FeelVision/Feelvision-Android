@@ -13,6 +13,7 @@ import com.feelvision.logging.DebugLogType
 import com.feelvision.tts.TTSManager
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 class CurrencyStrategy @Inject constructor(
     private val gemma: GemmaInferenceManager,
@@ -32,12 +33,13 @@ class CurrencyStrategy @Inject constructor(
         log.log(DebugLogType.MODE, "CUR", "Deactivated")
     }
 
-    override suspend fun processFrame(bitmap: Bitmap): ModeResult {
-        return processFrameStreaming(bitmap) { /* no UI callback when called via processFrame */ }
+    override suspend fun processFrame(bitmap: Bitmap, userPrompt: String?): ModeResult {
+        return processFrameStreaming(bitmap, userPrompt) { /* no UI callback when called via processFrame */ }
     }
 
     override suspend fun processFrameStreaming(
         bitmap: Bitmap,
+        userPrompt: String?,
         onChunk: suspend (String) -> Unit
     ): ModeResult {
         if (bitmap.isRecycled || bitmap.width == 0 || bitmap.height == 0) {
@@ -65,7 +67,7 @@ class CurrencyStrategy @Inject constructor(
             var hadError: InferenceResult.Failure? = null
 
             gemma.generateStream(
-                prompt           = "Identify the currency note in this image.",
+                prompt           = userPrompt ?: "Identify the currency note in this image.",
                 images           = listOf(bitmap),
                 baseSystemPrompt = ModePrompts.CURRENCY,
                 modeTag          = "CURRENCY",
@@ -113,6 +115,8 @@ class CurrencyStrategy @Inject constructor(
                 tts.speak("I could not identify the currency.")
                 ModeResult.Error("Empty response")
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.log(DebugLogType.ERROR, "CUR",
                 "processFrameStreaming CRASHED: ${e.javaClass.simpleName}: ${e.message}")

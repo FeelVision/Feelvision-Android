@@ -184,86 +184,6 @@ fun MainScreen(
             )
         }
 
-        // ── Capture and Mode switcher buttons (bottom) ────────────────────
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(bottom = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Burst progress badge
-            val isBusy = state.isInferring || state.burstProgress != null
-            AnimatedVisibility(
-                visible = state.burstProgress != null,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                Surface(
-                    color = Color(0xFFFFAA00),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.padding(bottom = 4.dp)
-                ) {
-                    Text(
-                        "Capturing ${state.burstProgress ?: ""}",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                    )
-                }
-            }
-
-            // Capture Button
-            Button(
-                onClick = { viewModel.onIntent(MainIntent.Capture) },
-                shape = CircleShape,
-                modifier = Modifier.size(72.dp),
-                enabled = !isBusy && !state.isListeningForMode,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (state.burstProgress != null)
-                        Color(0xFFFFAA00) else modeColor(state.currentMode),
-                    contentColor = Color.White,
-                    disabledContainerColor = if (state.burstProgress != null)
-                        Color(0xFFFFAA00).copy(alpha = 0.6f)
-                    else modeColor(state.currentMode).copy(alpha = 0.6f)
-                ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                if (isBusy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        color = Color.White,
-                        strokeWidth = 3.dp
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.CameraAlt,
-                        contentDescription = "Capture",
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
-
-            // Voice Mode Button
-            OutlinedButton(
-                onClick = { viewModel.onIntent(MainIntent.StartVoiceModeSwitch) },
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.5.dp, if (state.isListeningForMode) Color(0xFFE57373) else FVColors.DeepBlue.copy(alpha = 0.4f)),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = if (state.isListeningForMode) Color(0xFFE57373) else FVColors.DeepBlue
-                ),
-                enabled = !isBusy
-            ) {
-                Icon(if (state.isListeningForMode) Icons.Default.Mic else Icons.Default.MicNone, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(if (state.isListeningForMode) "Listening..." else "Switch Mode", style = MaterialTheme.typography.labelLarge)
-            }
-        }
-
         // ── Captured Result Overlay ───────────────────────────────────────
         AnimatedVisibility(
             visible = state.capturedBitmap != null,
@@ -345,6 +265,86 @@ fun MainScreen(
                         style = MaterialTheme.typography.labelSmall.copy(color = Color.White.copy(alpha = 0.4f))
                     )
                 }
+            }
+        }
+
+        // ── Capture and Mode switcher buttons (bottom) ────────────────────
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Burst progress badge
+            val isBusy = state.isInferring || state.burstProgress != null
+            AnimatedVisibility(
+                visible = state.burstProgress != null,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Surface(
+                    color = Color(0xFFFFAA00),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.padding(bottom = 4.dp)
+                ) {
+                    Text(
+                        "Capturing ${state.burstProgress ?: ""}",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
+                }
+            }
+
+            // Capture Button
+            Button(
+                onClick = { viewModel.onIntent(MainIntent.Capture) },
+                shape = CircleShape,
+                modifier = Modifier.size(72.dp),
+                enabled = !state.isListeningForMode,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (state.burstProgress != null)
+                        Color(0xFFFFAA00) else modeColor(state.currentMode),
+                    contentColor = Color.White,
+                    disabledContainerColor = if (state.burstProgress != null)
+                        Color(0xFFFFAA00).copy(alpha = 0.6f)
+                    else modeColor(state.currentMode).copy(alpha = 0.6f)
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                if (isBusy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = Color.White,
+                        strokeWidth = 3.dp
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.CameraAlt,
+                        contentDescription = "Capture",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+
+            // Voice Mode Button
+            OutlinedButton(
+                onClick = { viewModel.onIntent(MainIntent.StartVoiceModeSwitch) },
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.5.dp, if (state.isListeningForMode) Color(0xFFE57373) else FVColors.DeepBlue.copy(alpha = 0.4f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (state.isListeningForMode) Color(0xFFE57373) else FVColors.DeepBlue
+                ),
+                enabled = !isBusy
+            ) {
+                Icon(if (state.isListeningForMode) Icons.Default.Mic else Icons.Default.MicNone, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (state.isListeningForMode) "Listening..." else "Switch Mode", style = MaterialTheme.typography.labelLarge)
             }
         }
     }

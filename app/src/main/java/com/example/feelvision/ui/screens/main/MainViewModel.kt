@@ -18,6 +18,7 @@ import com.feelvision.speech.SpeechRecognitionManager
 
 import android.graphics.Bitmap
 import androidx.compose.ui.platform.debugInspectorInfo
+import kotlin.coroutines.cancellation.CancellationException
 
 data class MainUiState(
     val currentMode: AppMode = AppMode.Default,
@@ -53,6 +54,19 @@ class MainViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(MainUiState())
     val state: StateFlow<MainUiState> = _state.asStateFlow()
+
+    private var activeJob: kotlinx.coroutines.Job? = null
+
+    private fun cancelActiveCapture() {
+        activeJob?.let {
+            if (it.isActive) {
+                gemma.cancelInference()
+                speechRecognizer.stopListening()
+                tts.silence()
+                it.cancel()
+            }
+        }
+    }
 
     init {
         viewModelScope.launch {
@@ -92,10 +106,13 @@ class MainViewModel @Inject constructor(
 
     fun onIntent(intent: MainIntent) {
         when (intent) {
-            is MainIntent.SwitchMode -> viewModelScope.launch { coordinator.switchTo(intent.mode) }
+            is MainIntent.SwitchMode -> {
+                cancelActiveCapture()
+                viewModelScope.launch { coordinator.switchTo(intent.mode) }
+            }
             is MainIntent.Capture -> {
-                if (_state.value.isInferring || _state.value.burstProgress != null) return
-                viewModelScope.launch {
+                cancelActiveCapture()
+                activeJob = viewModelScope.launch {
                     if (!gemma.isReady()) {
                         _state.update { it.copy(statusText = "Model not ready") }
                         tts.speak("Model not ready yet.")
@@ -134,28 +151,34 @@ class MainViewModel @Inject constructor(
 
     private suspend fun executeSingleCapture() {
         _state.update { it.copy(isInferring = true, statusText = "Capturing...", capturedBitmap = null, streamingText = "") }
-        val bmp = hardware.captureNow()
-        if (bmp != null) {
-            // Create a copy for the UI to prevent crash if strategy recycles original
-            val displayBmp = bmp.copy(bmp.config ?: Bitmap.Config.ARGB_8888, true)
-            _state.update { it.copy(statusText = "Listening...", capturedBitmap = displayBmp) }
-            
-            tts.playBeep()
-            val prompt = speechRecognizer.waitForSpeech()
-            
-            _state.update { it.copy(statusText = "Analyzing...") }
-            try {
-                val result = coordinator.activeStrategy.processFrameStreaming(bmp, prompt) { chunk ->
-                    _state.update { it.copy(streamingText = it.streamingText + chunk + " ") }
+        try {
+            val bmp = hardware.captureNow()
+            if (bmp != null) {
+                // Create a copy for the UI to prevent crash if strategy recycles original
+                val displayBmp = bmp.copy(bmp.config ?: Bitmap.Config.ARGB_8888, true)
+                _state.update { it.copy(statusText = "Listening...", capturedBitmap = displayBmp) }
+                
+                tts.playBeep()
+                val prompt = speechRecognizer.waitForSpeech()
+                
+                _state.update { it.copy(statusText = "Analyzing...") }
+                try {
+                    val result = coordinator.activeStrategy.processFrameStreaming(bmp, prompt) { chunk ->
+                        _state.update { it.copy(streamingText = it.streamingText + chunk + " ") }
+                    }
+                    _state.update { it.copy(lastResult = result, statusText = "Ready") }
+                } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                    _state.update { it.copy(statusText = "Ready") }
+                    throw e
+                } catch (e: Exception) {
+                    _state.update { it.copy(statusText = "Analysis failed") }
                 }
-                _state.update { it.copy(lastResult = result, statusText = "Ready") }
-            } catch (e: Exception) {
-                _state.update { it.copy(statusText = "Analysis failed") }
+            } else {
+                _state.update { it.copy(statusText = "Capture failed") }
             }
-        } else {
-            _state.update { it.copy(statusText = "Capture failed") }
+        } finally {
+            _state.update { it.copy(isInferring = false) }
         }
-        _state.update { it.copy(isInferring = false) }
     }
 
     // ── Burst capture (Navigate) ────────────────────────────────────────
@@ -211,6 +234,9 @@ class MainViewModel @Inject constructor(
                     _state.update { it.copy(streamingText = it.streamingText + chunk + " ") }
                 }
                 _state.update { it.copy(lastResult = result, statusText = "Ready") }
+            } catch (e: CancellationException) {
+                _state.update { it.copy(statusText = "Ready") }
+                throw e
             } catch (e: Exception) {
                 _state.update { it.copy(statusText = "Analysis failed") }
             }

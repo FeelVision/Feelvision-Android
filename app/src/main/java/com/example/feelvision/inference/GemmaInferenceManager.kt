@@ -232,7 +232,7 @@ class GemmaInferenceManager @Inject constructor(
             } catch (e: CancellationException) {
                 debugLogBus.log(DebugLogType.WARN, modeTag,
                     "Inference cancelled — requestId=$requestId", requestId)
-                InferenceResult.Failure("Cancelled")
+                throw e
             } catch (e: Exception) {
                 debugLogBus.log(
                     DebugLogType.ERROR, modeTag,
@@ -326,7 +326,8 @@ class GemmaInferenceManager @Inject constructor(
             } catch (e: CancellationException) {
                 debugLogBus.log(DebugLogType.WARN, modeTag,
                     "Stream cancelled — requestId=$requestId", requestId)
-                emit(InferenceResult.Failure("Cancelled"))
+                emit(InferenceResult.Cancelled("Cancelled"))
+                throw e
             } catch (e: Exception) {
                 debugLogBus.log(
                     DebugLogType.ERROR, modeTag,

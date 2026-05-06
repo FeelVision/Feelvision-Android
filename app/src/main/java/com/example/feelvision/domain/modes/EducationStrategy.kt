@@ -13,6 +13,7 @@ import com.feelvision.logging.DebugLogType
 import com.feelvision.tts.TTSManager
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 class EducationStrategy @Inject constructor(
     private val gemma: GemmaInferenceManager,
@@ -110,6 +111,8 @@ class EducationStrategy @Inject constructor(
                 tts.speak("I could not explain what I see.")
                 ModeResult.Error("Empty response")
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.log(DebugLogType.ERROR, "EDU",
                 "processFrameStreaming CRASHED: ${e.javaClass.simpleName}: ${e.message}")

@@ -13,6 +13,7 @@ import com.feelvision.logging.DebugLogType
 import com.feelvision.tts.TTSManager
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 class CurrencyStrategy @Inject constructor(
     private val gemma: GemmaInferenceManager,
@@ -114,6 +115,8 @@ class CurrencyStrategy @Inject constructor(
                 tts.speak("I could not identify the currency.")
                 ModeResult.Error("Empty response")
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.log(DebugLogType.ERROR, "CUR",
                 "processFrameStreaming CRASHED: ${e.javaClass.simpleName}: ${e.message}")

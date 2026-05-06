@@ -13,6 +13,7 @@ import com.feelvision.logging.DebugLogType
 import com.feelvision.tts.TTSManager
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 class NavigateStrategy @Inject constructor(
     private val gemma: GemmaInferenceManager,
@@ -137,6 +138,8 @@ class NavigateStrategy @Inject constructor(
                 tts.speak("I could not assess the path ahead.")
                 ModeResult.Error("Empty response")
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.log(DebugLogType.ERROR, "NAV",
                 "processFramesStreaming CRASHED: ${e.javaClass.simpleName}: ${e.message}")

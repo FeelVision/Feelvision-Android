@@ -39,6 +39,8 @@ class CaptureEngine @Inject constructor(
         activeJob?.let {
             if (it.isActive) {
                 gemma.cancelInference()   // tells native layer to stop NOW
+                speechRecognizer.stopListening()
+                tts.silence()
                 it.cancel()               // cancel the coroutine
             }
         }

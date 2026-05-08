@@ -12,7 +12,6 @@ import com.feelvision.domain.model.PhysicalButton
 import com.feelvision.hardware.HardwareSource
 import com.feelvision.hardware.LuckfoxBridge
 import com.feelvision.inference.GemmaInferenceManager
-import com.feelvision.inference.InferenceResult
 import com.feelvision.luckfox.LuckfoxTcpServer
 import com.feelvision.speech.SpeechRecognitionManager
 import com.feelvision.tts.TTSManager
@@ -23,6 +22,10 @@ import kotlinx.coroutines.flow.*
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
+
+import com.feelvision.domain.coordinator.ModeCoordinator
+import com.feelvision.domain.model.AppMode
+import com.feelvision.inference.ModePrompts
 
 enum class LuckfoxTtsState {
     IDLE,
@@ -37,7 +40,8 @@ class LuckfoxViewModel @Inject constructor(
     private val speechRecognizer: SpeechRecognitionManager,
     private val settings: SettingsRepository,
     private val hardware: HardwareSource,
-    private val buttonHandler: ButtonHandler
+    private val buttonHandler: ButtonHandler,
+    private val coordinator: ModeCoordinator
 ) : ViewModel() {
 
     private val streamingBuffer = StringBuilder()
@@ -46,6 +50,8 @@ class LuckfoxViewModel @Inject constructor(
     private val imageProcessingChannel = Channel<ByteArray>(Channel.CONFLATED)
 
     val serverStatus = luckfoxBridge.status
+
+    val currentMode: StateFlow<AppMode> = coordinator.activeModeFlow
 
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
@@ -120,9 +126,9 @@ class LuckfoxViewModel @Inject constructor(
             }
         }
 
-        // Listen for hardware and simulated button events
+        // Listen for hardware, luckfox glasses, and simulated button events
         viewModelScope.launch {
-            merge(hardware.buttonEvents, _buttonEvents).collect { event ->
+            merge(hardware.buttonEvents, _buttonEvents, luckfoxBridge.buttonEvents).collect { event ->
                 handleButtonEvent(event)
             }
         }
@@ -189,10 +195,30 @@ class LuckfoxViewModel @Inject constructor(
                     processWithGemma(useVoicePrompt = false)
                 }
                 PhysicalButton.B -> {
-                    processWithGemma(useVoicePrompt = true)
+                    viewModelScope.launch {
+                        val nextMode = AppMode.next(coordinator.activeMode)
+                        coordinator.switchTo(nextMode)
+                        tts.speak(nextMode.getLocalizedAnnouncement(tts.currentLanguageTag))
+                        addLog("Switched to mode: ${nextMode.displayName}")
+                    }
                 }
                 PhysicalButton.C -> {
                     stopAllTTS()
+                }
+            }
+            is ButtonEvent.LongPress -> when (event.button) {
+                PhysicalButton.A -> {
+                    processWithGemma(useVoicePrompt = true)
+                }
+                PhysicalButton.B -> {
+                    viewModelScope.launch {
+                        tts.speak("Which mode?")
+                        speechRecognizer.startListening()
+                        addLog("Started Voice Mode Switcher")
+                    }
+                }
+                PhysicalButton.C -> {
+                    playTTS()
                 }
             }
             is ButtonEvent.DoubleTap -> when (event.button) {
@@ -208,8 +234,8 @@ class LuckfoxViewModel @Inject constructor(
     fun processWithGemma(useVoicePrompt: Boolean) {
         cancelActiveCapture()
 
-        val image = _currentImage.value
-        if (image == null) {
+        val originalBmp = _currentImage.value
+        if (originalBmp == null) {
             addLog("No image to process")
             return
         }
@@ -225,75 +251,44 @@ class LuckfoxViewModel @Inject constructor(
             _currentResponse.value = ""
             streamingBuffer.clear()
 
-            val finalPrompt = if (useVoicePrompt) {
+            val voicePrompt = if (useVoicePrompt) {
                 addLog("Playing beep, waiting for voice prompt...")
                 _isListeningForPrompt.value = true
                 tts.playBeep()
                 val prompt = speechRecognizer.waitForSpeech()
                 _isListeningForPrompt.value = false
-                prompt ?: "Describe this image in detail."
+                if (prompt.isNullOrBlank()) null else prompt
             } else {
-                "Describe this image in detail."
+                null
             }
 
-            addLog("Running Gemma inference with prompt: '$finalPrompt'...")
+            val finalPrompt = voicePrompt ?: when (coordinator.activeMode) {
+                AppMode.Default -> ModePrompts.DEFAULT
+                AppMode.OCR -> ModePrompts.OCR
+                AppMode.Navigate -> ModePrompts.NAVIGATE
+                AppMode.Face -> ModePrompts.FACE
+                AppMode.Currency -> ModePrompts.CURRENCY
+                AppMode.Edu -> ModePrompts.EDU
+                AppMode.Narrate -> ModePrompts.NARRATE
+            }
+
+            val strategy = coordinator.activeStrategy
+            addLog("Running active strategy: ${strategy.mode.displayName} with prompt: '${finalPrompt}'...")
 
             try {
-                val sentenceBuffer = StringBuilder()
-                val fullText = StringBuilder()
-                val language = try {
-                    settings.language.first()
-                } catch (e: Exception) {
-                    "English"
-                }
-
-                gemma.generateStream(
-                    prompt = finalPrompt,
-                    images = listOf(image),
-                    baseSystemPrompt = "You are an assistant. Be concise and precise.",
-                    modeTag = "LUCKFOX",
-                    responseLanguage = language
-                ).collect { result ->
-                    when (result) {
-                        is InferenceResult.Streaming -> {
-                            val chunk = result.partial
-                            fullText.append(chunk)
-                            sentenceBuffer.append(chunk)
-                            _currentResponse.value = fullText.toString()
-
-                            // Flush on sentence boundary
-                            val text = sentenceBuffer.toString()
-                            val lastBoundary = text.lastIndexOfAny(charArrayOf('.', '!', '?', '\n'))
-                            if (lastBoundary >= 0) {
-                                val toSpeak = text.substring(0, lastBoundary + 1).trim()
-                                if (toSpeak.isNotEmpty()) {
-                                    tts.speakChunk(toSpeak)
-                                }
-                                sentenceBuffer.clear()
-                                sentenceBuffer.append(text.substring(lastBoundary + 1))
-                            }
-                        }
-                        is InferenceResult.Success -> {
-                            // Handled by streaming finished
-                        }
-                        is InferenceResult.Failure -> {
-                            addLog("Gemma failed: ${result.error}")
-                        }
-                        is InferenceResult.NotReady -> {
-                            addLog("Model not ready")
-                        }
-                        is InferenceResult.Cancelled -> {
-                            addLog("Inference cancelled")
-                        }
+                // Create a copy because the strategy recycles the passed bitmap in its finally block
+                val processingBmp = originalBmp.copy(originalBmp.config ?: Bitmap.Config.ARGB_8888, true)
+                
+                val result = strategy.processFrameStreaming(processingBmp, finalPrompt) { chunk ->
+                    withContext(Dispatchers.Main) {
+                        streamingBuffer.append(chunk).append(" ")
+                        _currentResponse.value = streamingBuffer.toString().trim()
                     }
                 }
-
-                // Flush remaining buffer
-                val remaining = sentenceBuffer.toString().trim()
-                if (remaining.isNotEmpty()) {
-                    tts.speakChunk(remaining)
-                }
-                addLog("Gemma Finished.")
+                addLog("Gemma Finished with result: $result")
+            } catch (e: CancellationException) {
+                addLog("Inference cancelled")
+                throw e
             } catch (e: Exception) {
                 addLog("Processing error: ${e.message}")
             } finally {
@@ -330,6 +325,5 @@ class LuckfoxViewModel @Inject constructor(
         super.onCleared()
         cancelActiveCapture()
         buttonHandler.isLuckfoxActive = false
-        luckfoxBridge.stop()
     }
 }

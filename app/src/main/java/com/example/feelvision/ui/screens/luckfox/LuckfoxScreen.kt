@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.feelvision.luckfox.LuckfoxTcpServer
 import com.feelvision.ui.theme.FVColors
+import com.feelvision.ui.components.modeColor
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +46,7 @@ fun LuckfoxScreen(
     val ttsState by viewModel.ttsState.collectAsState()
     val isListeningForPrompt by viewModel.isListeningForPrompt.collectAsState()
     val gemmaReady by viewModel.gemmaReady.collectAsState()
+    val currentMode by viewModel.currentMode.collectAsState()
 
     val isRunning = serverStatus.state == LuckfoxTcpServer.ServerState.LISTENING || 
                     serverStatus.state == LuckfoxTcpServer.ServerState.CONNECTED
@@ -184,6 +187,10 @@ fun LuckfoxScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
+                    ActiveModeCard(mode = currentMode)
+                }
+
+                item {
                     ImageDisplayCard(
                         bitmap = currentImage,
                         timestamp = imageTimestamp,
@@ -200,12 +207,7 @@ fun LuckfoxScreen(
                     }
                 }
 
-                item {
-                    SimulateButtonsCard(
-                        viewModel = viewModel,
-                        isListening = isListeningForPrompt
-                    )
-                }
+
 
                 item {
                     LogPanel(
@@ -246,125 +248,47 @@ fun LuckfoxScreen(
     }
 }
 
+
+
 @Composable
-fun SimulateButtonsCard(
-    viewModel: LuckfoxViewModel,
-    isListening: Boolean
+fun ActiveModeCard(
+    mode: com.feelvision.domain.model.AppMode,
+    modifier: Modifier = Modifier
 ) {
+    val modeColor = modeColor(mode)
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = FVColors.Surface),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                "Simulate Physical Buttons",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = FVColors.DarkNavy
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(modeColor)
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Button A
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        "BTN A · Quick Inf",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = FVColors.DarkNavy.copy(alpha = 0.5f),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp
-                        )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = "Active Strategy Mode",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = FVColors.DarkNavy.copy(alpha = 0.5f),
+                        fontWeight = FontWeight.Bold
                     )
-                    OutlinedButton(
-                        onClick = { viewModel.simulateButton(com.feelvision.domain.model.PhysicalButton.A) },
-                        modifier = Modifier.fillMaxWidth().height(36.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, FVColors.DeepBlue.copy(alpha = 0.4f)),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text("SHORT", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = FVColors.DeepBlue)
-                    }
-                }
-
-                // Button B
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        "BTN B · Voice Prompt",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = FVColors.DarkNavy.copy(alpha = 0.5f),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp
-                        )
+                )
+                Text(
+                    text = mode.displayName,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        color = FVColors.DarkNavy,
+                        fontWeight = FontWeight.Bold
                     )
-                    OutlinedButton(
-                        onClick = { viewModel.simulateButton(com.feelvision.domain.model.PhysicalButton.B) },
-                        modifier = Modifier.fillMaxWidth().height(36.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, if (isListening) Color(0xFFE57373) else FVColors.DeepBlue.copy(alpha = 0.4f)),
-                        contentPadding = PaddingValues(0.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (isListening) Color(0xFFE57373).copy(alpha = 0.15f) else Color.Transparent
-                        )
-                    ) {
-                        Text(
-                            text = if (isListening) "LISTENING" else "SHORT",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isListening) Color(0xFFE57373) else FVColors.DeepBlue
-                        )
-                    }
-                }
-
-                // Button C
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        "BTN C · System TTS",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = FVColors.DarkNavy.copy(alpha = 0.5f),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp
-                        )
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        OutlinedButton(
-                            onClick = { viewModel.simulateButton(com.feelvision.domain.model.PhysicalButton.C) },
-                            modifier = Modifier.weight(1.5f).height(36.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, FVColors.DeepBlue.copy(alpha = 0.4f)),
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            Text("SIL", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = FVColors.DeepBlue, fontSize = 9.sp)
-                        }
-                        OutlinedButton(
-                            onClick = { viewModel.simulateButton(com.feelvision.domain.model.PhysicalButton.C, "double") },
-                            modifier = Modifier.weight(1.5f).height(36.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, FVColors.DeepBlue.copy(alpha = 0.4f)),
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            Text("REP", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = FVColors.DeepBlue, fontSize = 9.sp)
-                        }
-                    }
-                }
+                )
             }
         }
     }

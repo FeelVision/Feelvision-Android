@@ -18,6 +18,8 @@ import java.net.SocketException
 
 import com.feelvision.hardware.LuckfoxBridge
 import com.feelvision.hardware.HardwareCommand
+import com.feelvision.domain.model.ButtonEvent
+import com.feelvision.domain.model.PhysicalButton
 
 class LuckfoxTcpServer(
     private val port: Int = 8065,
@@ -27,8 +29,12 @@ class LuckfoxTcpServer(
     private val _receivedImages = MutableSharedFlow<ByteArray>(extraBufferCapacity = 5)
     override val receivedImages: SharedFlow<ByteArray> = _receivedImages.asSharedFlow()
 
+    private val _buttonEvents = MutableSharedFlow<ButtonEvent>(extraBufferCapacity = 10)
+    override val buttonEvents: SharedFlow<ButtonEvent> = _buttonEvents.asSharedFlow()
+
     private val _logs = MutableSharedFlow<String>(extraBufferCapacity = 100)
     val logs: SharedFlow<String> = _logs.asSharedFlow()
+
 
     companion object {
         private const val TAG = "LuckfoxTcpServer"
@@ -192,26 +198,41 @@ class LuckfoxTcpServer(
             clientOutputStream = DataOutputStream(socket.getOutputStream())
 
             while (currentCoroutineContext().isActive && !socket.isClosed) {
-                val imageSize: Int
+                val header = ByteArray(7)
                 try {
-                    imageSize = input.readInt()
+                    input.readFully(header)
                 } catch (e: Exception) {
                     break
                 }
 
-                if (imageSize <= 0 || imageSize > 50_000_000) continue
+                val btnId = header[0].toInt() and 0xFF
+                val pressType = header[1].toInt() and 0xFF
+                val hasFrame = header[2].toInt() and 0xFF
 
-                log("Receiving image $imageCount ($imageSize bytes)...")
-                val imageData = ByteArray(imageSize)
-                var bytesRead = 0
+                val frameSize = (
+                    ((header[3].toInt() and 0xFF) shl 24) or
+                    ((header[4].toInt() and 0xFF) shl 16) or
+                    ((header[5].toInt() and 0xFF) shl 8) or
+                    (header[6].toInt() and 0xFF)
+                )
 
-                while (bytesRead < imageSize) {
-                    val n = input.read(imageData, bytesRead, imageSize - bytesRead)
-                    if (n < 0) break
-                    bytesRead += n
-                }
+                log("Header Received: BTN_ID=$btnId, PRESS_TYPE=$pressType, HAS_FRAME=$hasFrame, FRAME_SIZE=$frameSize")
 
-                if (bytesRead == imageSize) {
+                if (hasFrame == 1) {
+                    if (frameSize <= 0 || frameSize > 50_000_000) {
+                        log("Invalid frame size: $frameSize")
+                        continue
+                    }
+
+                    log("Receiving image $imageCount ($frameSize bytes)...")
+                    val imageData = ByteArray(frameSize)
+                    try {
+                        input.readFully(imageData)
+                    } catch (e: Exception) {
+                        log("Failed to read image data: ${e.message}")
+                        break
+                    }
+
                     val jpegData = ImageConverter.nv21ToJpeg(imageData, frameWidth, frameHeight)
                     if (jpegData != null) {
                         imageCount++
@@ -224,9 +245,30 @@ class LuckfoxTcpServer(
                     } else {
                         log("Conversion failed for image $imageCount")
                     }
-                } else {
-                    log("Partial image received")
-                    break
+                }
+
+                // Map and emit button events
+                val physicalButton = when (btnId) {
+                    1 -> PhysicalButton.A
+                    2 -> PhysicalButton.B
+                    3 -> PhysicalButton.C
+                    else -> null
+                }
+
+                if (physicalButton != null) {
+                    val pressEvent = if (pressType == 2) {
+                        ButtonEvent.LongPress(physicalButton)
+                    } else {
+                        ButtonEvent.ShortPress(physicalButton)
+                    }
+
+                    // Slight delay to ensure image decoding flow has processed and updated _currentImage first
+                    if (hasFrame == 1) {
+                        delay(200)
+                    }
+
+                    log("Emitting physical button event: $pressEvent")
+                    _buttonEvents.tryEmit(pressEvent)
                 }
             }
         } catch (e: Exception) {

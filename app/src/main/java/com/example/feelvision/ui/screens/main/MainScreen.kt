@@ -41,6 +41,7 @@ fun MainScreen(
     onSettings: () -> Unit,
     onPeople: () -> Unit,
     onDebug: () -> Unit,
+    onLuckfox: () -> Unit,
     showDebugButton: Boolean
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -107,6 +108,14 @@ fun MainScreen(
             }
 
             Spacer(Modifier.width(8.dp))
+            IconButton(onClick = onLuckfox, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    Icons.Default.CastConnected,
+                    "Luckfox",
+                    tint = if (state.luckfoxConnected) FVColors.LeafGreen else FVColors.DeepBlue,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             if (showDebugButton) {
                 IconButton(onClick = { viewModel.onIntent(MainIntent.ScanModel) }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Refresh, "Scan Model", tint = FVColors.DeepBlue, modifier = Modifier.size(20.dp))

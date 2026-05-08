@@ -47,14 +47,14 @@ fun NavGraph(
                 onSettings = { navController.navigate(Screen.Settings.route) },
                 onPeople = { navController.navigate(Screen.People.route) },
                 onDebug = { if (showDebug) navController.navigate(Screen.Debug.route) },
+                onLuckfox = { navController.navigate(Screen.Luckfox.route) },
                 showDebugButton = showDebug
             )
         }
 
         composable(Screen.Settings.route) {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
-                onNavigateToLuckfox = { navController.navigate(Screen.Luckfox.route) }
+                onBack = { navController.popBackStack() }
             )
         }
 

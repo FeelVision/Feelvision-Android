@@ -1,5 +1,6 @@
 package com.feelvision.hardware
 
+import com.feelvision.domain.model.ButtonEvent
 import com.feelvision.luckfox.LuckfoxTcpServer
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,6 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
 interface LuckfoxBridge {
     /** Stream of images received from the hardware. */
     val receivedImages: SharedFlow<ByteArray>
+
+    /** Stream of button events received from the hardware. */
+    val buttonEvents: SharedFlow<ButtonEvent>
 
     /** Current status of the hardware connection. */
     val status: StateFlow<LuckfoxTcpServer.ServerStatus>
@@ -23,3 +27,4 @@ interface LuckfoxBridge {
     /** Stops the communication bridge. */
     fun stop()
 }
+

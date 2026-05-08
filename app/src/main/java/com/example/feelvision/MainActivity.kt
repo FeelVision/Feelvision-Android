@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
+import android.hardware.usb.UsbManager
 import com.feelvision.data.settings.SettingsRepository
 import com.feelvision.hardware.ButtonEventSource
 import com.feelvision.hardware.PhoneCameraSource
@@ -23,6 +24,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var buttonSource: ButtonEventSource
     @Inject lateinit var cameraSource: PhoneCameraSource
+    @Inject lateinit var luckfoxBridge: com.feelvision.hardware.LuckfoxBridge
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,6 +63,84 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val debugEnabled by settings.debugEnabled.collectAsStateWithLifecycle(false)
                 NavGraph(navController = navController, showDebug = debugEnabled, cameraSource = cameraSource)
+            }
+        }
+
+        // Auto-start Luckfox server if already plugged in on app launch
+        checkAndStartLuckfoxServer()
+    }
+
+    private val usbReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            val action = intent?.action
+            if (UsbManager.ACTION_USB_DEVICE_ATTACHED == action ||
+                UsbManager.ACTION_USB_DEVICE_DETACHED == action) {
+                
+                val device = intent.getParcelableExtra<android.hardware.usb.UsbDevice>(UsbManager.EXTRA_DEVICE)
+                if (device != null) {
+                    val vendorId = device.vendorId
+                    val productId = device.productId
+                    if (vendorId == 0x2207 || vendorId == 8711 || 
+                        (vendorId == 0x0525 && productId == 0xa4a2) || 
+                        (vendorId == 1317 && productId == 42146)) {
+                        
+                        if (UsbManager.ACTION_USB_DEVICE_ATTACHED == action) {
+                            android.util.Log.d("MainActivity", "Luckfox attached via broadcast! Starting server...")
+                            val serverState = luckfoxBridge.status.value.state
+                            if (serverState == com.feelvision.luckfox.LuckfoxTcpServer.ServerState.STOPPED || 
+                                serverState == com.feelvision.luckfox.LuckfoxTcpServer.ServerState.ERROR) {
+                                luckfoxBridge.start()
+                            }
+                        } else {
+                            android.util.Log.d("MainActivity", "Luckfox detached via broadcast! Stopping server...")
+                            luckfoxBridge.stop()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = android.content.IntentFilter().apply {
+            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+        }
+        registerReceiver(usbReceiver, filter)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unregisterReceiver(usbReceiver)
+    }
+
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        if (intent?.action == android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED) {
+            android.util.Log.d("MainActivity", "USB Device Attached Intent received!")
+            checkAndStartLuckfoxServer()
+        }
+    }
+
+    private fun checkAndStartLuckfoxServer() {
+        val usbManager = getSystemService(android.content.Context.USB_SERVICE) as? UsbManager ?: return
+        val deviceList = usbManager.deviceList
+        for (device in deviceList.values) {
+            val vendorId = device.vendorId
+            val productId = device.productId
+            // Check if it's Luckfox board (vendor 0x2207 / 8711 or Netchip 0x0525 / 1317 with product 0xa4a2 / 42146)
+            if (vendorId == 0x2207 || vendorId == 8711 || 
+                (vendorId == 0x0525 && productId == 0xa4a2) || 
+                (vendorId == 1317 && productId == 42146)) {
+                
+                val serverState = luckfoxBridge.status.value.state
+                if (serverState == com.feelvision.luckfox.LuckfoxTcpServer.ServerState.STOPPED || 
+                    serverState == com.feelvision.luckfox.LuckfoxTcpServer.ServerState.ERROR) {
+                    android.util.Log.d("MainActivity", "Luckfox matching USB device detected but server is in state $serverState. Starting server automatically...")
+                    luckfoxBridge.start()
+                }
+                break
             }
         }
     }

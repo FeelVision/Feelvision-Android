@@ -68,9 +68,6 @@ class LuckfoxViewModel @Inject constructor(
     private val _currentResponse = MutableStateFlow("")
     val currentResponse: StateFlow<String> = _currentResponse.asStateFlow()
 
-    private val _logMessages = MutableStateFlow<List<String>>(emptyList())
-    val logMessages: StateFlow<List<String>> = _logMessages.asStateFlow()
-
     val isSpeaking: StateFlow<Boolean> = tts.isSpeaking
 
     val ttsState: StateFlow<LuckfoxTtsState> = tts.isSpeaking.map { speaking ->
@@ -315,10 +312,7 @@ class LuckfoxViewModel @Inject constructor(
     }
 
     fun addLog(msg: String) {
-        val time = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(Date())
-        val formattedMsg = "[$time] $msg"
-        Log.d("LuckfoxVM", formattedMsg)
-        _logMessages.value = _logMessages.value + formattedMsg
+        Log.d("LuckfoxVM", msg)
     }
 
     override fun onCleared() {

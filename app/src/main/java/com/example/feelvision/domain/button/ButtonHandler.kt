@@ -36,17 +36,15 @@ class ButtonHandler @Inject constructor(
         }
     }
 
+    var isLuckfoxActive: Boolean = false
+
     private fun handle(event: ButtonEvent) {
+        if (isLuckfoxActive) return
         scope.launch {
             when (event) {
                 is ButtonEvent.ShortPress -> when (event.button) {
                     PhysicalButton.A -> {
-                        if (captureEngine.isBurstRunning) {
-                            captureEngine.cancelBurst()
-                            tts.speak("Cancelled.")
-                        } else {
-                            captureEngine.execute(coordinator.activeStrategy)
-                        }
+                        captureEngine.execute(coordinator.activeStrategy)
                     }
                     PhysicalButton.B -> {
                         tts.speak("Which mode?")

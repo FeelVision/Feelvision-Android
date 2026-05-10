@@ -48,9 +48,9 @@ fun SettingsScreen(
                 )
             )
         }
-    ) { padding ->
+    ) { paddingValues ->
         LazyColumn(
-            modifier = Modifier.padding(padding).padding(horizontal = 16.dp),
+            modifier = Modifier.padding(paddingValues).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item { SettingsSectionHeader("Voice & Language") }
@@ -92,22 +92,6 @@ fun SettingsScreen(
                         subtitle = "TTS speaks mode name",
                         checked = state.announceModeSwitch,
                         onCheckedChange = { viewModel.setAnnounceMode(it) }
-                    )
-                }
-            }
-
-            item { SettingsSectionHeader("Device") }
-
-            item {
-                SettingsCard {
-                    SettingsActionRow(
-                        label = "Luckfox Pairing",
-                        subtitle = if (state.devicePaired) "Connected: ${state.deviceName}"
-                                   else "No device paired",
-                        icon = Icons.Default.Bluetooth,
-                        iconTint = if (state.devicePaired) FVColors.LeafGreen
-                                   else FVColors.DeepBlue,
-                        onClick = { viewModel.openPairing() }
                     )
                 }
             }

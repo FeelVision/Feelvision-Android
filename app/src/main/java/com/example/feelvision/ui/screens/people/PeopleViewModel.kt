@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import com.feelvision.facedetection.FaceRecognitionHelper
 import javax.inject.Inject
 
 data class PeopleUiState(
@@ -41,7 +42,8 @@ class PeopleViewModel @Inject constructor(
     private val repo             : PeopleRepository,
     private val hardware         : HardwareSource,
     private val tts              : TTSManager,
-    private val speechRecognizer : SpeechRecognitionManager
+    private val speechRecognizer : SpeechRecognitionManager,
+    private val faceHelper       : FaceRecognitionHelper
 ) : ViewModel() {
 
     init {
@@ -178,6 +180,9 @@ class PeopleViewModel @Inject constructor(
                     notes    = s.notes.trim()
                 )
             }
+            // Generate/update face embeddings from the captured photos
+            faceHelper.ensureAllEmbeddingsComputed(repo)
+
             _enrollState.update { it.copy(isSaving = false, savedSuccess = true) }
             true
         } catch (e: Exception) {

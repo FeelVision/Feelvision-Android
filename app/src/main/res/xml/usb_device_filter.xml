@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- USB device filter targeting Fuzhou Rockchip Electronics (Luckfox boards) Vendor ID (0x2207 / 8711) -->
+    <usb-device vendor-id="0x2207" />
+    <usb-device vendor-id="8711" />
+
+    <!-- USB device filter targeting Netchip Technology, Inc. Linux-USB Ethernet/RNDIS Gadget (0x0525:a4a2 / 1317:42146) Booted linux mode -->
+    <usb-device vendor-id="0x0525" product-id="0xa4a2" />
+    <usb-device vendor-id="1317" product-id="42146" />
+</resources>

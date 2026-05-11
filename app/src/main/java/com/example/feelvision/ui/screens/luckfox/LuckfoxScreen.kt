@@ -28,7 +28,6 @@ import com.feelvision.luckfox.LuckfoxTcpServer
 import com.feelvision.ui.theme.FVColors
 import com.feelvision.ui.components.modeColor
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LuckfoxScreen(
@@ -41,7 +40,6 @@ fun LuckfoxScreen(
     val imageTimestamp by viewModel.imageTimestamp.collectAsState()
     val imageSize by viewModel.imageSize.collectAsState()
     val currentResponse by viewModel.currentResponse.collectAsState()
-    val logMessages by viewModel.logMessages.collectAsState()
     val isSpeaking by viewModel.isSpeaking.collectAsState()
     val ttsState by viewModel.ttsState.collectAsState()
     val isListeningForPrompt by viewModel.isListeningForPrompt.collectAsState()
@@ -191,28 +189,18 @@ fun LuckfoxScreen(
                 }
 
                 item {
-                    ImageDisplayCard(
+                    ImageDisplayFrame(
                         bitmap = currentImage,
                         timestamp = imageTimestamp,
                         imageSize = imageSize
                     )
                 }
 
-                if (currentResponse.isNotEmpty()) {
-                    item {
-                        ResponseCard(
-                            response = currentResponse,
-                            isSpeaking = isSpeaking
-                        )
-                    }
-                }
-
-
-
                 item {
-                    LogPanel(
-                        logs = logMessages,
-                        modifier = Modifier.height(180.dp)
+                    AiResponseBox(
+                        response = currentResponse,
+                        isSpeaking = isSpeaking,
+                        modifier = Modifier.heightIn(min = 180.dp)
                     )
                 }
             }
@@ -295,199 +283,158 @@ fun ActiveModeCard(
 }
 
 @Composable
-fun LogPanel(
-    logs: List<String>,
-    modifier: Modifier = Modifier
-) {
-    val listState = rememberLazyListState()
-
-    LaunchedEffect(logs.size) {
-        if (logs.isNotEmpty()) {
-            listState.animateScrollToItem(logs.size - 1)
-        }
-    }
-
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = FVColors.Surface),
-        modifier = modifier.fillMaxWidth()
+fun SectionHeader(title: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                "Activity Log",
-                style = MaterialTheme.typography.titleMedium,
+        Text(
+            title.uppercase(),
+            style = MaterialTheme.typography.labelMedium.copy(
                 fontWeight = FontWeight.Bold,
-                color = FVColors.DarkNavy
+                color = FVColors.DarkNavy.copy(alpha = 0.6f),
+                letterSpacing = 1.2.sp
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        FVColors.SkyBlue.copy(alpha = 0.3f),
-                        RoundedCornerShape(8.dp)
-                    )
-                    .padding(8.dp)
-            ) {
-                items(logs) { log ->
-                    Text(
-                        log,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
-                        ),
-                        color = when {
-                            log.contains("error") || log.contains("Error") || log.contains("failed") -> Color(0xFFD32F2F)
-                            log.contains("Connected") || log.contains("Finished") -> FVColors.LeafGreen
-                            log.contains("Listening") -> Color(0xFFE65100)
-                            else -> FVColors.DarkNavy
-                        }
-                    )
-                }
-            }
-        }
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = FVColors.DarkNavy.copy(alpha = 0.2f)
+        )
     }
 }
 
 @Composable
-fun ResponseCard(
-    response: String,
-    isSpeaking: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = FVColors.Surface),
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    "Gemma Real-time Response",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = FVColors.DarkNavy
-                )
-                if (isSpeaking) {
-                    Icon(
-                        Icons.Default.VolumeUp,
-                        contentDescription = "Speaking",
-                        modifier = Modifier.size(20.dp),
-                        tint = FVColors.LeafGreen
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                response,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    lineHeight = 22.sp,
-                    color = FVColors.DarkNavy
-                )
-            )
-        }
-    }
-}
-
-@Composable
-fun ImageDisplayCard(
+fun ImageDisplayFrame(
     bitmap: Bitmap?,
     timestamp: String?,
     imageSize: Int,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = FVColors.Surface),
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+    Column(modifier = modifier.fillMaxWidth()) {
+        SectionHeader("LIVE FRAME")
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White.copy(alpha = 0.4f))
         ) {
-            Text(
-                "Luckfox Live Stream Frame",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = FVColors.DarkNavy
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(FVColors.SkyBlue.copy(alpha = 0.4f)),
-                contentAlignment = Alignment.Center
-            ) {
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Captured Image",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Default.CastConnected,
-                            contentDescription = null,
-                            modifier = Modifier.size(52.dp),
-                            tint = FVColors.DeepBlue.copy(alpha = 0.6f)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Waiting for Luckfox Frame Connection...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = FVColors.DeepBlue.copy(alpha = 0.8f)
-                        )
-                    }
-                }
-            }
-
             if (bitmap != null) {
-                Spacer(modifier = Modifier.height(10.dp))
-
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Captured Image",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                
+                // Frame counter badge / timestamp
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(12.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Save, null, modifier = Modifier.size(14.dp), tint = FVColors.DeepBlue)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            "${imageSize / 1024} KB",
-                            style = MaterialTheme.typography.bodySmall.copy(color = FVColors.DeepBlue, fontWeight = FontWeight.SemiBold)
-                        )
-                    }
+                    Icon(Icons.Default.Save, null, modifier = Modifier.size(12.dp), tint = Color.White)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("${imageSize / 1024} KB", style = MaterialTheme.typography.labelSmall.copy(color = Color.White))
+                    
                     timestamp?.let {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Schedule, null, modifier = Modifier.size(14.dp), tint = FVColors.DeepBlue)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                it, 
-                                style = MaterialTheme.typography.bodySmall.copy(color = FVColors.DeepBlue, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.Schedule, null, modifier = Modifier.size(12.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(it, style = MaterialTheme.typography.labelSmall.copy(color = Color.White))
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.CastConnected,
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp),
+                        tint = FVColors.DarkNavy.copy(alpha = 0.4f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Waiting for Luckfox connection...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FVColors.DarkNavy.copy(alpha = 0.5f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AiResponseBox(
+    response: String,
+    isSpeaking: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        SectionHeader("AI RESPONSE")
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White.copy(alpha = 0.4f))
+        ) {
+            if (response.isBlank()) {
+                Column(
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.Chat,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = FVColors.DarkNavy.copy(alpha = 0.4f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Response will appear here after\na frame is captured and processed",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FVColors.DarkNavy.copy(alpha = 0.5f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            } else {
+                // Active Response State
+                Column(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth()
+                ) {
+                    if (isSpeaking) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Icon(
+                                Icons.Default.VolumeUp,
+                                contentDescription = "Speaking",
+                                modifier = Modifier.size(20.dp),
+                                tint = FVColors.LeafGreen
                             )
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
+                    Text(
+                        response,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            lineHeight = 22.sp,
+                            color = FVColors.DarkNavy
+                        )
+                    )
                 }
             }
         }

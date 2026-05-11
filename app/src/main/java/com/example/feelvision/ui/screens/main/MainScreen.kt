@@ -27,9 +27,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.feelvision.domain.model.AppMode
 import com.feelvision.domain.model.ModeResult
 import com.feelvision.hardware.PhoneCameraSource
-import com.feelvision.ui.components.MicOrb
-import com.feelvision.ui.components.ModeRing
-import com.feelvision.ui.components.WaveformBar
 import com.feelvision.ui.components.modeColor
 import com.feelvision.ui.theme.FVColors
 import androidx.compose.ui.viewinterop.AndroidView
@@ -56,104 +53,115 @@ fun MainScreen(
             .fillMaxSize()
             .background(FVColors.SkyBlue)
     ) {
-        // ── Top bar ──────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "feelvision",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold, color = FVColors.DarkNavy
-                )
-            )
-            Spacer(Modifier.weight(1f))
-
-            // Connection indicator
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Gemma Status
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(if (state.gemmaReady) FVColors.LeafGreen else FVColors.DeepBlue.copy(alpha = 0.3f))
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    "AI",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = if (state.gemmaReady) FVColors.DarkNavy else FVColors.DarkNavy.copy(alpha = 0.4f),
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-                
-                Spacer(Modifier.width(12.dp))
-
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(if (state.luckfoxConnected) FVColors.LeafGreen else Color(0xFFE57373))
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    if (state.luckfoxConnected) "HW" else "DBG",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = FVColors.DarkNavy.copy(alpha = 0.6f)
-                    )
-                )
-            }
-
-            Spacer(Modifier.width(8.dp))
-            IconButton(onClick = onLuckfox, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    Icons.Default.CastConnected,
-                    "Luckfox",
-                    tint = if (state.luckfoxConnected) FVColors.LeafGreen else FVColors.DeepBlue,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            if (showDebugButton) {
-                IconButton(onClick = { viewModel.onIntent(MainIntent.ScanModel) }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Refresh, "Scan Model", tint = FVColors.DeepBlue, modifier = Modifier.size(20.dp))
-                }
-                IconButton(onClick = onDebug, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.BugReport, "Debug", tint = FVColors.DeepBlue, modifier = Modifier.size(20.dp))
-                }
-            }
-            IconButton(onClick = onPeople, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.People, "People", tint = FVColors.DeepBlue, modifier = Modifier.size(20.dp))
-            }
-            IconButton(onClick = onSettings, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Settings, "Settings", tint = FVColors.DeepBlue, modifier = Modifier.size(20.dp))
-            }
-        }
-
-        // ── Center content ───────────────────────────────────────────────
         Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Small Camera Preview Rectangle
+            // ── Top bar ──────────────────────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "feelvision",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold, color = FVColors.DarkNavy
+                    )
+                )
+
+                Spacer(Modifier.weight(1f))
+
+                // Connection indicator
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Gemma Status
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (state.gemmaReady) FVColors.LeafGreen else FVColors.DeepBlue.copy(alpha = 0.3f))
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "AI",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = if (state.gemmaReady) FVColors.DarkNavy else FVColors.DarkNavy.copy(alpha = 0.4f),
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    
+                    Spacer(Modifier.width(12.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (state.luckfoxConnected) FVColors.LeafGreen else Color(0xFFE57373))
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (state.luckfoxConnected) "HW" else "DBG",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = FVColors.DarkNavy.copy(alpha = 0.6f)
+                        )
+                    )
+                }
+
+                Spacer(Modifier.width(8.dp))
+                IconButton(onClick = onLuckfox, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.CastConnected,
+                        "Luckfox",
+                        tint = if (state.luckfoxConnected) FVColors.LeafGreen else FVColors.DeepBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                if (showDebugButton) {
+                    IconButton(onClick = { viewModel.onIntent(MainIntent.ScanModel) }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Refresh, "Scan Model", tint = FVColors.DeepBlue, modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(onClick = onDebug, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.BugReport, "Debug", tint = FVColors.DeepBlue, modifier = Modifier.size(20.dp))
+                    }
+                }
+                IconButton(onClick = onPeople, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.People, "People", tint = FVColors.DeepBlue, modifier = Modifier.size(20.dp))
+                }
+                IconButton(onClick = onSettings, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Settings, "Settings", tint = FVColors.DeepBlue, modifier = Modifier.size(20.dp))
+                }
+            }
+            
+            // ── Camera Preview (Top Half) ───────────────────────────────────
             Box(
                 modifier = Modifier
-                    .size(width = 240.dp, height = 180.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color.Black)
-                    .border(2.dp, FVColors.DeepBlue.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.Black.copy(alpha = 0.8f))
+                    .clickable(enabled = state.capturedBitmap != null) {
+                        viewModel.onIntent(MainIntent.DismissResult)
+                    }
             ) {
-                AndroidView(
-                    factory = { ctx ->
-                        PreviewView(ctx).also { pv ->
-                            preview.setSurfaceProvider(pv.surfaceProvider)
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (state.capturedBitmap != null) {
+                    Image(
+                        bitmap = state.capturedBitmap!!.asImageBitmap(),
+                        contentDescription = "Captured Frame",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    AndroidView(
+                        factory = { ctx ->
+                            PreviewView(ctx).also { pv ->
+                                preview.setSurfaceProvider(pv.surfaceProvider)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
                 
                 // Active indicator
                 Box(
@@ -164,197 +172,167 @@ fun MainScreen(
                         .clip(CircleShape)
                         .background(FVColors.LeafGreen)
                 )
+
+                // "Live preview" gradient overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
+                            )
+                        )
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (state.capturedBitmap != null) Icons.Default.Image else Icons.Default.Visibility,
+                            contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = if (state.capturedBitmap != null) "Captured (Tap to dismiss)" else "Live preview",
+                            style = MaterialTheme.typography.labelMedium.copy(color = Color.White)
+                        )
+                    }
+                }
             }
-
-            Spacer(Modifier.height(32.dp))
-
-            ModeRing(mode = state.currentMode, modifier = Modifier.size(160.dp))
-
-            Spacer(Modifier.height(36.dp))
-
-            val isListening = state.isListeningForMode
-            MicOrb(isListening = isListening, modifier = Modifier.size(72.dp))
-
-            Spacer(Modifier.height(16.dp))
-
-            WaveformBar(
-                data = emptyList(),
-                active = isListening,
-                modifier = Modifier.width(200.dp).height(32.dp)
-            )
 
             Spacer(Modifier.height(24.dp))
 
-            Text(
-                if (isListening) "Listening for mode..." else state.statusText,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    color = FVColors.DarkNavy.copy(alpha = 0.65f)
-                )
-            )
-        }
-
-        // ── Captured Result Overlay ───────────────────────────────────────
-        AnimatedVisibility(
-            visible = state.capturedBitmap != null,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
-            Box(
+            // ── Bottom Section ───────────────────────────────────────────────
+            Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.9f))
-                    .clickable { viewModel.onIntent(MainIntent.DismissResult) },
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                // Mode Header + Divider
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Analysis Result",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            color = Color.White, fontWeight = FontWeight.Bold
+                        text = "${state.currentMode.name} MODE".uppercase(),
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            color = FVColors.DarkNavy,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp
                         )
                     )
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.width(16.dp))
+                    Divider(
+                        modifier = Modifier.weight(1f),
+                        color = FVColors.DarkNavy.copy(alpha = 0.2f),
+                        thickness = 1.dp
+                    )
+                }
 
-                    state.capturedBitmap?.let { bmp ->
-                        Image(
-                            bitmap = bmp.asImageBitmap(),
-                            contentDescription = "Captured Frame",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 320.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .border(1.5.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(16.dp)),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
+                Spacer(Modifier.height(24.dp))
 
-                    Spacer(Modifier.height(24.dp))
-
-                    val resultText = when {
-                        // Show streaming text while inference is in progress
-                        state.isInferring && state.streamingText.isNotEmpty() -> state.streamingText
-                        state.isInferring -> "Analyzing image..."
-                        else -> when (val res = state.lastResult) {
-                            is ModeResult.NarrationText -> res.description
-                            is ModeResult.TextRead -> res.text
-                            is ModeResult.NavigationInstruction -> res.instruction
-                            is ModeResult.CurrencyDetected -> "${res.denomination} — ${res.series}"
-                            is ModeResult.PersonRecognized -> "${res.name} (${res.relation})"
-                            is ModeResult.EduContent -> res.content
-                            is ModeResult.Error -> "Error: ${res.message}"
-                            is ModeResult.UnknownPerson -> "Unknown person"
-                            is ModeResult.NoResult -> "No result"
-                            else -> "Processing..."
+                // Small mode circle and status text
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Circular indicator
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .border(1.5.dp, FVColors.DarkNavy.copy(alpha = 0.2f), CircleShape)
+                            .background(Color.White.copy(alpha = 0.4f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = state.currentMode.ordinal.toString(),
+                                style = MaterialTheme.typography.titleLarge.copy(color = FVColors.DarkNavy, fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = state.currentMode.name.take(3).uppercase(),
+                                style = MaterialTheme.typography.labelSmall.copy(color = FVColors.DarkNavy.copy(alpha = 0.6f), fontSize = 10.sp)
+                            )
                         }
                     }
+                    
+                    Spacer(Modifier.width(20.dp))
+                    
+                    // Status text
+                    val isListening = state.isListeningForMode
+                    Text(
+                        text = if (isListening) "Listening..." else state.statusText,
+                        style = MaterialTheme.typography.bodyLarge.copy(color = FVColors.DarkNavy.copy(alpha = 0.7f), lineHeight = 24.sp),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
 
-                    Surface(
-                        color = Color.White.copy(alpha = 0.1f),
+                AnimatedVisibility(visible = state.isListeningForMode) {
+                    com.feelvision.ui.components.WaveformBar(
+                        data = emptyList(),
+                        active = true,
+                        modifier = Modifier.fillMaxWidth().height(32.dp).padding(top = 16.dp)
+                    )
+                }
+
+                Spacer(Modifier.height(48.dp))
+            }
+                
+            // ── Capture and Mode switcher buttons (bottom) ────────────────────
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .navigationBarsPadding()
+                    .padding(bottom = 24.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    // Switch Mode Button
+                    OutlinedButton(
+                        onClick = { viewModel.onIntent(MainIntent.StartVoiceModeSwitch) },
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        border = BorderStroke(1.dp, FVColors.DarkNavy.copy(alpha = 0.3f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = FVColors.DarkNavy)
                     ) {
-                        Text(
-                            text = resultText,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                color = Color.White,
-                                lineHeight = 26.sp
-                            ),
-                            modifier = Modifier.padding(16.dp)
-                        )
+                        Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Switch Mode", style = MaterialTheme.typography.labelLarge)
                     }
 
-                    Spacer(Modifier.height(32.dp))
-                    Text(
-                        "Tap anywhere to dismiss",
-                        style = MaterialTheme.typography.labelSmall.copy(color = Color.White.copy(alpha = 0.4f))
-                    )
+                    // Capture Button area
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        AnimatedVisibility(visible = state.burstProgress != null) {
+                            Surface(
+                                color = Color(0xFFFFAA00),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) {
+                                Text(
+                                    "Capturing ${state.burstProgress ?: ""}",
+                                    style = MaterialTheme.typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                        
+                        val isBusy = state.isInferring || state.burstProgress != null
+                        Button(
+                            onClick = { viewModel.onIntent(MainIntent.Capture) },
+                            shape = CircleShape,
+                            modifier = Modifier.size(72.dp),
+                            enabled = !state.isListeningForMode,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (state.burstProgress != null) Color(0xFFFFAA00) else FVColors.DeepBlue,
+                                contentColor = Color.White
+                            ),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = "Capture", modifier = Modifier.size(32.dp))
+                        }
+                    }
                 }
             }
         }
 
-        // ── Capture and Mode switcher buttons (bottom) ────────────────────
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(bottom = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Burst progress badge
-            val isBusy = state.isInferring || state.burstProgress != null
-            AnimatedVisibility(
-                visible = state.burstProgress != null,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                Surface(
-                    color = Color(0xFFFFAA00),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.padding(bottom = 4.dp)
-                ) {
-                    Text(
-                        "Capturing ${state.burstProgress ?: ""}",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                    )
-                }
-            }
 
-            // Capture Button
-            Button(
-                onClick = { viewModel.onIntent(MainIntent.Capture) },
-                shape = CircleShape,
-                modifier = Modifier.size(72.dp),
-                enabled = !state.isListeningForMode,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (state.burstProgress != null)
-                        Color(0xFFFFAA00) else modeColor(state.currentMode),
-                    contentColor = Color.White,
-                    disabledContainerColor = if (state.burstProgress != null)
-                        Color(0xFFFFAA00).copy(alpha = 0.6f)
-                    else modeColor(state.currentMode).copy(alpha = 0.6f)
-                ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                if (isBusy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        color = Color.White,
-                        strokeWidth = 3.dp
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.CameraAlt,
-                        contentDescription = "Capture",
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
 
-            // Voice Mode Button
-            OutlinedButton(
-                onClick = { viewModel.onIntent(MainIntent.StartVoiceModeSwitch) },
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.5.dp, if (state.isListeningForMode) Color(0xFFE57373) else FVColors.DeepBlue.copy(alpha = 0.4f)),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = if (state.isListeningForMode) Color(0xFFE57373) else FVColors.DeepBlue
-                ),
-                enabled = !isBusy
-            ) {
-                Icon(if (state.isListeningForMode) Icons.Default.Mic else Icons.Default.MicNone, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(if (state.isListeningForMode) "Listening..." else "Switch Mode", style = MaterialTheme.typography.labelLarge)
-            }
-        }
     }
 }

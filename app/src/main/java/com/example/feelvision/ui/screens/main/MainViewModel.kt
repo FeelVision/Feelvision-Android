@@ -66,6 +66,7 @@ class MainViewModel @Inject constructor(
                 it.cancel()
             }
         }
+        tts.silence()
     }
 
     init {
@@ -83,13 +84,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             speechRecognizer.isListening.collect { listening ->
                 _state.update { it.copy(isListeningForMode = listening) }
-            }
-        }
-
-        // Sync speech recognition errors
-        viewModelScope.launch {
-            speechRecognizer.error.collect { errorMsg ->
-                _state.update { it.copy(statusText = "Speech error: $errorMsg") }
             }
         }
 
@@ -177,7 +171,7 @@ class MainViewModel @Inject constructor(
                 _state.update { it.copy(statusText = "Capture failed") }
             }
         } finally {
-            _state.update { it.copy(isInferring = false) }
+            _state.update { it.copy(isInferring = false, capturedBitmap = null) }
         }
     }
 
@@ -241,7 +235,7 @@ class MainViewModel @Inject constructor(
                 _state.update { it.copy(statusText = "Analysis failed") }
             }
         } finally {
-            _state.update { it.copy(burstProgress = null, isInferring = false) }
+            _state.update { it.copy(burstProgress = null, isInferring = false, capturedBitmap = null) }
         }
     }
 }

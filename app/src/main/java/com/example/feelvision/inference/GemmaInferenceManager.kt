@@ -30,12 +30,12 @@ class GemmaInferenceManager @Inject constructor(
         private const val MODEL_NAME    = "gemma-4-E2B-it.litertlm"
         // FIX 1: Increased MAX_TOKENS to 1024. Images consume a lot of tokens (often 256-1024).
         // Passing an image + text with MAX_TOKENS=512 causes a native overflow crash.
-        private const val MAX_TOKENS    = 1024
+        private const val MAX_TOKENS    = 4096
         private const val TOP_K         = 40
         private const val TOP_P         = 0.95f
         private const val TEMPERATURE   = 0.7f
         private const val IMG_MAX       = 336
-        private const val JPEG_QUALITY  = 85
+        private const val JPEG_QUALITY  = 90
         private const val TIMEOUT_MS    = 60_000L
     }
 
@@ -356,7 +356,8 @@ class GemmaInferenceManager @Inject constructor(
 
         // 1. Add Image Bytes first
         images.forEachIndexed { index, original ->
-            val scaled = resized(original)
+//            val scaled = resized(original)
+            val scaled = original
             if (scaled !== original) scaledBitmaps.add(scaled)  // track for cleanup
             val bytes = scaled.toJpeg()
             items.add(Content.ImageBytes(bytes))
@@ -420,7 +421,7 @@ class GemmaInferenceManager @Inject constructor(
         val modeRule = when (modeTag) {
             "OCR"      -> "Preserve important text exactly as seen first."
             "CURRENCY" -> "Say the denomination first."
-            "NAVIGATE" -> "Prefer short directional sentences."
+//            "NAVIGATE" -> "Prefer short directional sentences."
             else       -> ""
         }
         return "$base $directive $modeRule".trim()

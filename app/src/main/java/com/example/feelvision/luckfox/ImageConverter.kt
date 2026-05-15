@@ -24,6 +24,8 @@ object ImageConverter {
                 return null
             }
 
+            rotateNV21_180_InPlace(nv21Data, width, height)
+
             val yuvImage = YuvImage(
                 nv21Data,
                 ImageFormat.NV21,
@@ -48,6 +50,30 @@ object ImageConverter {
         } catch (e: Exception) {
             Log.e(TAG, "Conversion exception", e)
             null
+        }
+    }
+
+    private fun rotateNV21_180_InPlace(data: ByteArray, width: Int, height: Int) {
+        val size = width * height
+        // Rotate Y plane
+        for (i in 0 until size / 2) {
+            val temp = data[i]
+            data[i] = data[size - 1 - i]
+            data[size - 1 - i] = temp
+        }
+        // Rotate UV plane (V and U are interleaved)
+        // Total UV size is size / 2.
+        var left = size
+        var right = size + (size / 2) - 2
+        while (left < right) {
+            val tempV = data[left]
+            val tempU = data[left + 1]
+            data[left] = data[right]
+            data[left + 1] = data[right + 1]
+            data[right] = tempV
+            data[right + 1] = tempU
+            left += 2
+            right -= 2
         }
     }
 }

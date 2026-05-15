@@ -1,5 +1,7 @@
 package com.feelvision.inference
 
+import com.feelvision.domain.model.Person
+
 object ModePrompts {
 
     private const val BASE =
@@ -57,4 +59,48 @@ object ModePrompts {
     const val NARRATE =
         "$BASE Narrate the full scene in two or three spoken sentences. " +
         "Describe what is happening, where things are, and any relevant context."
+
+    fun buildAnnouncementText(matched: List<Person>, unknowns: Int, language: String): String {
+        val (prefix, your, and, oneUnknown, nUnknown) = when (language) {
+            "Hindi" -> listOf("पहचाना गया: ", ", आपका ", " और ", "एक अनजान व्यक्ति", "$unknowns अनजान लोग")
+            "Telugu" -> listOf("గుర్తించబడింది: ", ", మీ ", " మరియు ", "ఒక గుర్తుతెలియని వ్యక్తి", "$unknowns గుర్తుతెలియని వ్యక్తులు")
+            "Tamil" -> listOf("கண்டறியப்பட்டது: ", ", உங்கள் ", " மற்றும் ", "ஒரு அறியப்படாத நபர்", "$unknowns அறியப்படாத நபர்கள்")
+            "Kannada" -> listOf("ಪತ್ತೆಯಾಗಿದೆ: ", ", ನಿಮ್ಮ ", " ಮತ್ತು ", "ಒಂದು ಅಪರಿಚಿತ ವ್ಯಕ್ತಿ", "$unknowns ಅಪರಿಚಿತ ವ್ಯಕ್ತಿಗಳು")
+            "Malayalam" -> listOf("കണ്ടെത്തി: ", ", നിങ്ങളുടെ ", " കൂടാതെ ", "ഒരു అജ്ഞാത വ്യക്തി", "$unknowns అജ്ഞാത ആളുകൾ")
+            else -> listOf("I see ", ", your ", " and ", "one unknown person", "$unknowns unknown people")
+        }
+
+        val parts = mutableListOf<String>()
+
+        if (matched.isNotEmpty()) {
+            val matchedNames = matched.map { person ->
+                if (person.relation.isNotBlank()) {
+                    "${person.name}$your${person.relation}"
+                } else {
+                    person.name
+                }
+            }
+            if (matchedNames.size == 1) {
+                parts.add(matchedNames.first())
+            } else {
+                val listExceptLast = matchedNames.dropLast(1).joinToString(", ")
+                parts.add("$listExceptLast$and${matchedNames.last()}")
+            }
+        }
+
+        if (unknowns > 0) {
+            parts.add(if (unknowns == 1) oneUnknown else nUnknown)
+        }
+
+        val combined = when (parts.size) {
+            0 -> ""
+            1 -> parts.first()
+            else -> {
+                val listExceptLast = parts.dropLast(1).joinToString(", ")
+                "$listExceptLast$and${parts.last()}"
+            }
+        }
+
+        return "$prefix$combined."
+    }
 }

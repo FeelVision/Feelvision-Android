@@ -5,6 +5,11 @@
 FeelVision provides an attachable smart glasses clip-on module for visually impaired individuals. The system integrates a compact Luckfox Pico hardware module with a sophisticated Android application powered by AI inference, enabling real-time environmental awareness through multiple specialized modes. 
 
 For user documentation refer to https://feelvision.github.io/user-guide/
+For Luckfox Firmware refer to https://github.com/FeelVision/Luckfox-firmware
+
+BOM: Luckfox Pico Mini B, SC3336 Camera Module, Jumper wires, Soldering Iron, USB Type C to Type C Data cable.
+
+3D print the Hardware files from: https://github.com/FeelVision/Hardware-Design-Files
 
 
 

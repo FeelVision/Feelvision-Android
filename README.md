@@ -1,8 +1,20 @@
-# FeelVision Smart Glasses for Blind - Comprehensive Analysis Report
+# FeelVision Smart Glasses for Blind
 
 ## Executive Summary
 
-FeelVision is a groundbreaking hardware-software co-design project that provides an attachable smart glasses device for visually impaired individuals. The system integrates a compact Luckfox Pico hardware module with a sophisticated Android application powered by AI inference, enabling real-time environmental awareness through multiple specialized modes. This report provides a detailed analysis of the project's architecture, features, ease of use, and societal impact.
+FeelVision provides an attachable smart glasses clip-on module for visually impaired individuals. The system integrates a compact Luckfox Pico hardware module with a sophisticated Android application powered by AI inference, enabling real-time environmental awareness through multiple specialized modes. 
+
+For user documentation refer to https://feelvision.github.io/user-guide/
+
+
+
+<img src="images/image1.png" width="100%" alt="App Preview 1" />
+<img src="images/image2.png" width="100%" alt="App Preview 2" />
+<img src="images/image3.png" width="100%" alt="App Preview 3" />
+<img src="images/image4.png" width="100%" alt="App Preview 4" />
+<img src="images/image5.png" width="100%" alt="App Preview 5" />
+
+
 
 ---
 
